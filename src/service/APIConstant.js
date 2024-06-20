@@ -7,9 +7,9 @@ import { useRouter } from 'vue-router';
 // export const styleURL = 'http://127.0.0.1:8000';
 // export const storageURL = 'http://127.0.0.1:8000/storage/';
 
-export const baseURL = 'http://192.168.194.232:8001/api';
-export const styleURL = 'http://192.168.194.232:8001';
-export const storageURL = 'http://192.168.194.232:8001/storage/';
+export const baseURL = 'https://backend.mticket.co.mz/api';
+export const styleURL = 'https://backend.mticket.co.mz';
+export const storageURL = 'https://backend.mticket.co.mz/storage/';
 
 
 
