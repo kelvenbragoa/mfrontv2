@@ -1,0 +1,178 @@
+<script setup>
+import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
+import { baseURL } from '@/service/ApiConstant';
+import { onMounted, ref } from 'vue';
+import axios from 'axios';
+import { useForm } from 'vee-validate';
+import * as yup from 'yup';
+import { useToast } from 'primevue/usetoast';
+import InputText from 'primevue/inputtext';
+import Dropdown from 'primevue/dropdown';
+import moment from 'moment';
+
+
+const router = useRouter();
+const isLoadingDiv = ref(false);
+const isLoadingButton = ref(false);
+const retriviedData = ref();
+const provinces = ref([]);
+const cities = ref([]);
+const typeevent = ref([]);
+const categories = ref([]);
+const toast = useToast();
+
+function goBackUsingBack() {
+    if (router) {
+        router.back();
+    }
+}
+const schema = yup.object({
+    name: yup.string().required().trim().label('Nome'),
+    description: yup.string().required().trim().label('Descricao'),
+    event_id: yup.string().required().label('Evento'),
+    start_date: yup.string().required().label('Data'),
+    start_time: yup.string().required().label('Horas'),
+    end_date: yup.string().required().label('Data'),
+    end_time: yup.string().required().label('Horas')
+
+    // email: yup.string().required().email().label('Email province_id'),
+    // fullName: yup.string().required().label('Full name'),
+    // password: yup.string().required().min(6).label('Password'),
+    // passwordConfirm: yup
+    //     .string()
+    //     .oneOf([yup.ref('password')], 'Passwords must match')
+    //     .required()
+    //     .label('Password confirmation'),
+    // terms: yup.boolean().required().isTrue('You must agree to terms and conditions').label('terms agreement'),
+    // type: yup.string().required().label('Account type')
+});
+
+const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
+    validationSchema: schema
+});
+
+const [name] = defineField('name');
+const [event_id] = defineField('event_id');
+const [description] = defineField('description');
+const [start_date] = defineField('start_date');
+const [start_time] = defineField('start_time');
+const [end_date] = defineField('end_date');
+const [end_time] = defineField('end_time');
+
+
+
+const onSubmit = handleSubmit((values) => {
+
+    isLoadingButton.value = true;
+    axios
+        .put(`${baseURL}/promotor-lineups/${router.currentRoute.value.params.idlineup}`, values)
+        .then((response) => {
+            resetForm();
+            router.back();
+            toast.add({ severity: 'success', summary: `Successo`, detail: 'LineUp alterado com sucesso', life: 3000 });
+        })
+        .catch((error) => {
+            isLoadingButton.value = false;
+            toast.add({ severity: 'error', summary: `${error.response.data.message}`, detail: 'Detalhe da Mensagem', life: 3000 });
+            if (error.response.data.errors) {
+                setErrors(error.response.data.errors);
+            }
+        })
+        .finally(() => {
+            isLoadingButton.value = false;
+        });
+});
+
+const onFileUpload = (event) => {
+    image.value = event.files[0];
+    console.log(image.value);
+};
+
+const getData = () => {
+    axios
+    .get(`${baseURL}/promotor-lineups/${router.currentRoute.value.params.idlineup}/edit`)
+        .then((response) => {
+            // toast.add({ severity: 'success', summary: 'Success Message', detail: 'Message Detail', life: 3000 });
+            retriviedData.value = response.data.lineup;
+            name.value = retriviedData.value.name;
+            event_id.value = retriviedData.value.event_id;
+            start_time.value = retriviedData.value.start_time;
+            end_time.value = retriviedData.value.end_time;
+            start_date.value = retriviedData.value.start_date;
+            end_date.value = retriviedData.value.end_date;
+            description.value = retriviedData.value.description;
+
+
+            isLoadingDiv.value = false;
+        })
+        .catch((error) => {
+            isLoadingDiv.value = false;
+            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
+            goBackUsingBack();
+        });
+};
+onMounted(() => {
+    
+    getData();
+});
+</script>
+<template>
+    <div className="card" v-if="!isLoadingDiv">
+        <div class="col-12">
+            <div class="card-w-title">
+                <Button label="Voltar" class="mr-2 mb-2" @click="goBackUsingBack"><i class="pi pi-angle-left"></i> Voltar</Button>
+                <h5>Editar LineUp</h5>
+            </div>
+
+            <small class="p-error">Os campos marcados * sao considerados campos obrigatorios.</small>
+            <form @submit="onSubmit">
+                <div class="col-12 md:col-12">
+                    <div class="card p-fluid">
+                        <h5>Formulário Criação de LineUp</h5>
+                        <h5>Informação Geral</h5>
+                        <div class="field">
+                            <label for="name">Nome</label>
+                            <InputText v-model="name" id="name" type="text" :class="{ 'p-invalid': errors.name }" />
+                            <small id="name-help" class="p-error">{{ errors.name }}</small>
+                        </div>
+                        <div class="field">
+                            <label for="description">Descrição</label>
+                            <InputText v-model="description" id="description" type="text" :class="{ 'p-invalid': errors.description }" />
+                            <small id="description-help" class="p-error">{{ errors.description }}</small>
+                        </div>
+                        <div class="formgrid grid">
+                            <div class="field col">
+                                <label for="start_date">Data de Inicio</label>
+                                <Calendar :showIcon="true" :showButtonBar="true" v-model="start_date"></Calendar>
+                                <small id="start_date-help" class="p-error">{{ errors.start_date }}</small>
+                            </div>
+                            <div class="field col">
+                                <label for="start_time">Horas de Inicio</label>
+                                <InputText v-model="start_time" id="start_time" type="time" :class="{ 'p-invalid': errors.start_time }" />
+                                <small id="start_time-help" class="p-error">{{ errors.start_time }}</small>
+                            </div>
+                        </div>
+                        <div class="formgrid grid">
+                            <div class="field col">
+                                <label for="end_date">Data de Termino</label>
+                                <Calendar :showIcon="true" :showButtonBar="true" v-model="end_date"></Calendar>
+                                <small id="end_date-help" class="p-error">{{ errors.end_date }}</small>
+                            </div>
+                            <div class="field col">
+                                <label for="end_time">Horas de Termino</label>
+                                <InputText v-model="end_time" id="end_time" type="time" :class="{ 'p-invalid': errors.end_time }" />
+                                <small id="end_time-help" class="p-error">{{ errors.end_time }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    <Button label="Submeter" class="mr-2 mb-2" @click="onSubmit" :disabled="isLoadingButton"></Button
+                    ><ProgressSpinner style="width: 35px; height: 35px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" v-if="isLoadingButton" />
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="text-center" v-else>
+        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
+        <p>Por Favor Aguarde...</p>
+    </div>
+</template>
