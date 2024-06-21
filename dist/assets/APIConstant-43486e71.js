@@ -1,1 +1,0 @@
-import{h as o,x as e}from"./index-b670bd76.js";const s="https://backend.mticket.co.mz/api",c="https://backend.mticket.co.mz",r="https://backend.mticket.co.mz/storage/";function l(){o.post(`${s}/logout`).then(t=>{console.log(t),localStorage.removeItem("token"),localStorage.removeItem("user"),e.replace("/login")})}export{c as a,s as b,l,r as s};

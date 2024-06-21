@@ -56,7 +56,7 @@ onMounted(() => {
                     </a>
                 </li> -->
                 <li v-if="user">
-                    <router-link to="/eventos" class="flex m-0 md:ml-5 px-0 py-3 text-900 font-medium line-height-3 p-ripple" v-ripple>
+                    <router-link to="/meusbilhetes" class="flex m-0 md:ml-5 px-0 py-3 text-900 font-medium line-height-3 p-ripple" v-ripple>
                         <span>Meus Bilhetes</span>
                     </router-link>
                 </li>

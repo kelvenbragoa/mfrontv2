@@ -1,0 +1,1 @@
+import{h as t,z as e}from"./index-4c06444b.js";const s="http://127.0.0.1:8001/api",r="http://127.0.0.1:8001",l="http://127.0.0.1:8001/storage/";function n(){t.post(`${s}/logout`).then(o=>{console.log(o),localStorage.removeItem("token"),localStorage.removeItem("user"),e.replace("/login")})}export{r as a,s as b,n as l,l as s};

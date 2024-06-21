@@ -198,7 +198,7 @@ onMounted(() => {
                         <div class="formgrid grid">
                             <div class="field col">
                                 <label for="start_date">Data de Inicio</label>
-                                <Calendar :showIcon="true" :showButtonBar="true" v-model="start_date"></Calendar>
+                                <InputText v-model="start_date" id="start_date" type="date" :class="{ 'p-invalid': errors.start_date }" />
                                 <small id="start_date-help" class="p-error">{{ errors.start_date }}</small>
                             </div>
                             <div class="field col">
@@ -210,7 +210,8 @@ onMounted(() => {
                         <div class="formgrid grid">
                             <div class="field col">
                                 <label for="end_date">Data de Termino</label>
-                                <Calendar :showIcon="true" :showButtonBar="true" v-model="end_date"></Calendar>
+                                <InputText v-model="end_date" id="end_date" type="date" :class="{ 'p-invalid': errors.end_date }" />
+
                                 <small id="end_date-help" class="p-error">{{ errors.end_date }}</small>
                             </div>
                             <div class="field col">

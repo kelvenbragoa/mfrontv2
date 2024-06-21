@@ -12,7 +12,9 @@ const model = ref([
         label: 'Gestão',
         items: [
             { label: 'Eventos', icon: 'pi pi-fw pi-list', to: '/admin/eventos' },
-            { label: 'Analise Eventos', icon: 'pi pi-fw pi-chart-bar', to: '/admin/eventos1' },
+            { label: 'Transações', icon: 'pi pi-fw pi-chart-bar', to: '/admin/transacoes' },
+            { label: 'Tickets', icon: 'pi pi-fw pi-chart-bar', to: '/admin/tickets' },
+
             // { label: 'Form Layout', icon: 'pi pi-fw pi-id-card', to: '/uikit/formlayout' },
             // { label: 'Input', icon: 'pi pi-fw pi-check-square', to: '/uikit/input' },
             // { label: 'Float Label', icon: 'pi pi-fw pi-bookmark', to: '/uikit/floatlabel' },
@@ -30,12 +32,12 @@ const model = ref([
             // { label: 'Misc', icon: 'pi pi-fw pi-circle', to: '/uikit/misc' }
         ]
     },
-    {
-        label: 'Automatizações',
-        items: [
-            { label: 'Gestão da Página', icon: 'pi pi-fw pi-globe', to: '/admin/eventos2' }
-        ]
-    },
+    // {
+    //     label: 'Automatizações',
+    //     items: [
+    //         { label: 'Gestão da Página', icon: 'pi pi-fw pi-globe', to: '/admin/tickets' }
+    //     ]
+    // },
     {
         label: 'Configurações',
         items: [

@@ -30,7 +30,7 @@ const schema = yup.object({
     customerName: yup.string().required().trim().label('Nome'),
     customerEmail: yup.string().required().trim().label('Email'),
     customerMobile: yup.string().required().trim().label('Telefone'),
-    paymentNumber: yup.string().required().label('Telefone')
+    // paymentNumber: yup.string().required().label('Telefone')
 });
 
 const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
@@ -206,15 +206,19 @@ onMounted(() => {
                                     </div>
                                 </div>
                                 <div class="card p-fluid">
+                                    
                                     <h5>Informações do Pagamento</h5>
-                                    <img src="/demo/images/mpesa.png" alt="Logo" height="100" class="mr-2" />
-                                    <div class="field">
-                                        <label for="paymentNumber">Número de MPESA</label>
-                                        <InputText id="paymentNumber" v-model="paymentNumber" type="text" :class="{ 'p-invalid': errors.paymentNumber }" :disabled="isLoadingButton" />
-                                        <InputText id="user_id" v-model="user_id" type="hidden" />
+                                    <div v-if="retriviedData.type_event_id == 1">
+                                        <img src="/demo/images/mpesa.png" alt="Logo" height="100" class="mr-2" />
+                                        <div class="field">
+                                            <label for="paymentNumber">Número de MPESA</label>
+                                            <InputText id="paymentNumber" v-model="paymentNumber" type="text" :class="{ 'p-invalid': errors.paymentNumber }" :disabled="isLoadingButton" />
+                                            <InputText id="user_id" v-model="user_id" type="hidden" />
 
-                                        <small id="city_id-help" class="p-error">{{ errors.paymentNumber }}</small>
+                                            <small id="city_id-help" class="p-error">{{ errors.paymentNumber }}</small>
+                                        </div>
                                     </div>
+                                   
                                     <div class="field">
                                         <label>Valor Total a Pagar: {{ totalPrice.toFixed(2) }} MT</label>
                                     </div>

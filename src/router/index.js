@@ -17,6 +17,38 @@ const router = createRouter({
                     component: () => import('@/views/pages/admin/Dashboard.vue')
                 },
                 {
+                    path: '/admin/transacoes',
+                    name: 'admin.transacoes',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/transacoes/IndexTransacoes.vue')
+                },
+                {
+                    path: '/admin/tickets',
+                    name: 'admin.tickets',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/tickets/IndexTickets.vue')
+                },
+                {
+                    path: '/admin/tickets/:id',
+                    name: 'admin.tickets.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/tickets/ShowTickets.vue')
+                },
+                {
+                    path: '/admin/transacoes/:id/edit',
+                    name: 'admin.transacoes.edit',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/transacoes/EditTransacoes.vue')
+                },
+                {
                     path: '/admin/eventos',
                     name: 'admin.eventos',
                     meta: {
@@ -593,6 +625,11 @@ const router = createRouter({
                     path: '/ser-promotor',
                     name: 'ser.promotor',
                     component: () => import('@/views/pages/home/serpromotor/index.vue')
+                },
+                {
+                    path: '/meusbilhetes',
+                    name: 'meusbilhetes',
+                    component: () => import('@/views/pages/home/meusbilhetes/index.vue')
                 },
                 {
                     path: '/perfil',

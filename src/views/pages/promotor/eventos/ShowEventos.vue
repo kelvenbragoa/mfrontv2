@@ -533,10 +533,10 @@ onMounted(() => {
                 <Column field="name" sortable header="Nome"></Column>
                 <Column field="description" sortable header="Descrição"></Column>
                 <Column field="start_date" sortable header="Data Inicio">
-                    <template #body="slotProps"> {{ moment(slotProps.data.start_date).format('DD-MM-YYYY') }} - {{ slotProps.data.start_time }} </template>
+                    <template #body="slotProps">{{ slotProps.data.start_time }} </template>
                 </Column>
                 <Column field="end_date" sortable header="Data Fim">
-                    <template #body="slotProps"> {{ moment(slotProps.data.end_date).format('DD-MM-YYYY') }} - {{ slotProps.data.end_time }} </template>
+                    <template #body="slotProps"> {{ slotProps.data.end_time }} </template>
                 </Column>
                 <Column header="Ações">
                     <template #body="slotProps">
