@@ -108,7 +108,6 @@ import VirtualScroller from 'primevue/virtualscroller';
 
 import BlockViewer from '@/components/BlockViewer.vue';
 
-
 import '@/assets/styles.scss';
 
 const app = createApp(App);
@@ -223,11 +222,14 @@ app.component('TriStateCheckbox', TriStateCheckbox);
 app.component('VirtualScroller', VirtualScroller);
 
 app.config.globalProperties.$axios = axios;
-
+axios.defaults.withCredentials = true;
+axios.defaults.withXSRFToken = true;
 axios.interceptors.request.use((config) => {
+    config.headers.Accept = 'application/json';
     const token = localStorage.getItem('token');
     if (token) {
         config.headers.Authorization = `Bearer ${token}`;
+        config.headers.token = `Bearer ${token}`;
     }
     return config;
 });

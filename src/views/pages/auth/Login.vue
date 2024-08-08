@@ -5,7 +5,7 @@ import AppConfig from '@/layout/AppConfig.vue';
 import { useToast } from 'primevue/usetoast';
 import axios from 'axios';
 import router from '../../../router';
-import { baseURL } from '@/service/ApiConstant';
+import { baseURL, baseURL2 } from '@/service/ApiConstant';
 
 const toast = useToast();
 const email = ref('');
@@ -16,13 +16,14 @@ const errorMessage = ref('');
 
 const loginUser = () => {
     submitted.value = true;
+    // axios.get(`${baseURL2}/sanctum/csrf-cookie`).then(() => {
+
     axios
         .post(`${baseURL}/login`, {
             email: email.value.toLowerCase(),
             password: password.value
         })
         .then((response) => {
-            console.log(response.data.access_token);
             localStorage.setItem('token', response.data.access_token);
             localStorage.setItem('user', JSON.stringify(response.data.user));
             toast.add({ severity: 'success', summary: 'Successo', detail: 'Message Detail', life: 3000 });
@@ -44,6 +45,7 @@ const loginUser = () => {
         .finally(() => {
             submitted.value = false;
         });
+    // })
 };
 
 onBeforeMount(() => {

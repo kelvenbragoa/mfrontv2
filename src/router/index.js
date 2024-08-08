@@ -306,7 +306,43 @@ const router = createRouter({
                     meta: {
                         requiresAuth: true
                     },
-                    component: () => import('@/views/pages/admin/eventos/Dashboard.vue')
+                    component: () => import('@/views/pages/admin/eventos/dashboard/Dashboard.vue')
+                },
+                //evento dashboard bilhete
+                {
+                    path: '/admin/eventos/:id/dashboard/bilhetes',
+                    name: 'admin.eventos.dashboard.bilhetes',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/dashboard/bilhetes/IndexDashboardBilhetes.vue')
+                },
+                //evento dashboard pacotes
+                {
+                    path: '/admin/eventos/:id/dashboard/pacotes',
+                    name: 'admin.eventos.dashboard.pacotes',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/dashboard/pacotes/IndexDashboardPacotes.vue')
+                },
+                //evento dashboard convites
+                {
+                    path: '/admin/eventos/:id/dashboard/convites',
+                    name: 'admin.eventos.dashboard.convites',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/dashboard/convites/IndexDashboardConvites.vue')
+                },
+                //evento dashboard lineups
+                {
+                    path: '/admin/eventos/:id/dashboard/lineups',
+                    name: 'admin.eventos.dashboard.lineups',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/dashboard/lineups/IndexDashboardLineups.vue')
                 },
             ]
         },
@@ -581,7 +617,43 @@ const router = createRouter({
                     meta: {
                         requiresAuth: true
                     },
-                    component: () => import('@/views/pages/promotor/eventos/Dashboard.vue')
+                    component: () => import('@/views/pages/promotor/eventos/dashboard/Dashboard.vue')
+                },
+                //evento dashboard bilhete
+                {
+                    path: '/promotor/eventos/:id/dashboard/bilhetes',
+                    name: 'promotor.eventos.dashboard.bilhetes',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/dashboard/bilhetes/IndexDashboardBilhetes.vue')
+                },
+                //evento dashboard pacotes
+                {
+                    path: '/promotor/eventos/:id/dashboard/pacotes',
+                    name: 'promotor.eventos.dashboard.pacotes',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/dashboard/pacotes/IndexDashboardPacotes.vue')
+                },
+                //evento dashboard convites
+                {
+                    path: '/promotor/eventos/:id/dashboard/convites',
+                    name: 'promotor.eventos.dashboard.convites',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/dashboard/convites/IndexDashboardConvites.vue')
+                },
+                //evento dashboard lineups
+                {
+                    path: '/promotor/eventos/:id/dashboard/lineups',
+                    name: 'promotor.eventos.dashboard.lineups',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/dashboard/lineups/IndexDashboardLineups.vue')
                 },
             ]
         },

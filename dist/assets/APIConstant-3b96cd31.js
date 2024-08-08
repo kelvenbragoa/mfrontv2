@@ -1,0 +1,1 @@
+import{h as t,z as o}from"./index-da4e25fd.js";const e="https://backend.mticket.co.mz/api",c="https://backend.mticket.co.mz",r="https://backend.mticket.co.mz/storage/";function m(){t.post(`${e}/logout`).then(s=>{localStorage.removeItem("token"),localStorage.removeItem("user"),o.replace("/login")})}export{c as a,e as b,m as l,r as s};

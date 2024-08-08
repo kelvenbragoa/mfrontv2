@@ -85,7 +85,6 @@ const onSubmit = handleSubmit((values) => {
         values.image = image.value;
     }
 
-    console.log(values)
     isLoadingButton.value = true;
     axios
         .post(`${baseURL}/promotor-eventos/${router.currentRoute.value.params.id}`, values,{

@@ -95,6 +95,8 @@ const getData = async (page = 1) => {
             isLoadingDiv.value = false;
             toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
             goBackUsingBack();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
         });
 };
 
