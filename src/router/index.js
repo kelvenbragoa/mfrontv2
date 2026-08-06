@@ -130,6 +130,14 @@ const router = createRouter({
                     },
                     component: () => import('@/views/pages/admin/eventos/convites/ShowConvites.vue')
                 },
+                {
+                    path: '/admin/eventos/:id/convites/:idconvites/cliente/:idcliente',
+                    name: 'admin.eventos.show.convite.cliente.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/convites/ShowCliente.vue')
+                },
                 //pacotes
                 {
                     path: '/admin/eventos/:id/pacotes/create',
@@ -441,6 +449,14 @@ const router = createRouter({
                     },
                     component: () => import('@/views/pages/promotor/eventos/convites/ShowConvites.vue')
                 },
+                {
+                    path: '/promotor/eventos/:id/convites/:idconvites/cliente/:idcliente',
+                    name: 'promotor.eventos.show.convite.cliente.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/convites/ShowCliente.vue')
+                },
                 //pacotes
                 {
                     path: '/promotor/eventos/:id/pacotes/create',
@@ -697,6 +713,16 @@ const router = createRouter({
                     path: '/ser-promotor',
                     name: 'ser.promotor',
                     component: () => import('@/views/pages/home/serpromotor/index.vue')
+                },
+                {
+                    path: '/privacy',
+                    name: 'privacy',
+                    component: () => import('@/views/pages/home/privacy/index.vue')
+                },
+                {
+                    path: '/delete-my-account',
+                    name: 'delete.my.account',
+                    component: () => import('@/views/pages/home/privacy/delete-my-account.vue')
                 },
                 {
                     path: '/meusbilhetes',

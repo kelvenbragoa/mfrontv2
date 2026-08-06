@@ -111,7 +111,7 @@ onMounted(() => {
                             <span class="text-600"><i class="pi pi-fw pi-map-marker text-2xl"></i> {{ retriviedData.city.name }}, {{ retriviedData.province.name }}</span>
                         </p>
                         <p><Tag :value="getValue(retriviedData.end_date)" :severity="getSeverity(retriviedData.end_date)" style="right: 6px; top: 5px" /></p>
-                        <router-link :to="'/checkout/' + retriviedData.id + '/evento'" v-if="moment() < moment(retriviedData.end_date)"
+                        <router-link :to="'/checkout/' + retriviedData.slug + '/evento'" v-if="moment() < moment(retriviedData.end_date)"
                             ><Button label="Comprar" class="p-button-rounded border-none font-light text-white line-height-2 bg-blue-500"></Button
                         ></router-link>
                     </div>

@@ -19,7 +19,11 @@ const provinces = ref([]);
 const cities = ref([]);
 const typeevent = ref([]);
 const categories = ref([]);
-const tickets = ref([]);
+const protocols = ref([]);
+const selectedProtocol = ref(null); // Protocolo selecionado
+const total = ref(0);
+const idProtocolo = ref(0);
+
 
 //DIALOG
 const displayCreateTicket = ref(false);
@@ -83,13 +87,21 @@ const onSubmitCreateTicket = handleSubmit((values) => {
         });
 });
 
+const fetchProtocolData = () => {
+    console.log(selectedProtocol.value)
+    idProtocolo.value = selectedProtocol.value;
+    getData();
+}
+
 const getData = () => {
     axios
-        .get(`${baseURL}/promotor-protocolo/${router.currentRoute.value.params.idprotocolo}`)
+        // .get(`${baseURL}/promotor-protocolo/${router.currentRoute.value.params.idprotocolo}`)
+        .get(`${baseURL}/promotor-protocolo/${idProtocolo.value}`)
         .then((response) => {
             // toast.add({ severity: 'success', summary: 'Success Message', detail: 'Message Detail', life: 3000 });
             retriviedData.value = response.data.protocolo;
-            // provinces.value = response.data.province;
+            total.value = response.data.total;
+            protocols.value = response.data.protocols;
             // cities.value = response.data.city;
             // categories.value = response.data.category;
             // typeevent.value = response.data.typeevent;
@@ -103,6 +115,7 @@ const getData = () => {
         });
 };
 onMounted(() => {
+    idProtocolo.value = router.currentRoute.value.params.idprotocolo;
     getData();
 });
 </script>
@@ -113,6 +126,8 @@ onMounted(() => {
                 <Button label="Voltar" class="mr-2 mb-2" @click="goBackUsingBack"><i class="pi pi-angle-left"></i> Voltar</Button>
                 <!-- <h5>Evento</h5> -->
             </div>
+            <Dropdown v-model="selectedProtocol" :options="protocols" optionLabel="name" optionValue="id"
+                placeholder="Selecione um protocolo" class="w-full md:w-20rem" @change="fetchProtocolData" />
 
             <p>Detalhes do Protocolo</p>
             
@@ -121,6 +136,22 @@ onMounted(() => {
                 <p><strong>Telefone: </strong>{{ retriviedData.mobile }}</p>
                 <p><strong>BI: </strong>{{ retriviedData.bi }}</p>
                 <p><strong>Password: </strong>{{ retriviedData.password }}</p>
+                <hr>
+                <h5>Indicadores do Protocolo</h5>
+                <div class="grid">
+                    <div class="col-12 md:col-6 lg:col-3">
+                        <Card>
+                            <template #content>
+                                <div class="indicator-card">
+                                    <span class="pi pi-chart-bar icon"></span>
+                                    <h4>Bilhetes Verificados</h4>
+                                    <p class="value">{{ total }}</p>
+                                </div>
+                            </template>
+                        </Card>
+                    </div>
+                </div>
+
                 
             
         </div>

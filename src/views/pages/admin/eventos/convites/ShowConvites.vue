@@ -194,7 +194,8 @@ onMounted(() => {
                 <Column field="status" sortable header="Estado"></Column>
                 <Column header="Ações">
                     <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/convites/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
+                        <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/convites/' + slotProps.data.invite_id + '/cliente/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
+                        <!-- <router-link :to="'/admin/eventos/' + retriviedData.id + '/convites/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link> -->
                         <a href="#" @click.prevent="confirmDeletionInvite(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
                     </template>
                 </Column>

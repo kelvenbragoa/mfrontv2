@@ -17,6 +17,8 @@ const toast = useToast();
 const isLoadingDiv = ref(true);
 const searchQuery = ref(null);
 const retriviedData = ref({ data: [] });
+const loadingprint = ref(false);
+
 function goBackUsingBack() {
     if (router) {
         router.back();
@@ -44,6 +46,34 @@ const getData = async (page = 1) => {
 onMounted(() => {
     getData();
 });
+
+const downloadPDFProducts = () => {
+    loadingprint.value = true;
+
+    loadingprint.value = false;
+
+    axios({
+        url: `${baseURL}/download-report/${router.currentRoute.value.params.id}/products`,
+        responseType: 'blob'
+    })
+        .then((response) => {
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'barreport' + retriviedData.value.id + '.pdf');
+            document.body.appendChild(link);
+            link.click();
+            loadingprint.value = false;
+            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Documento baixado com sucesso', life: 3000 });
+        })
+        .catch((error) => {
+            loadingprint.value = false;
+            toast.add({ severity: 'error', summary: `Erro`, detail: 'Erro', life: 3000 });
+        })
+        .finally(() => {
+            loadingprint.value = false;
+        });
+};
 </script>
 
 <template>
@@ -171,6 +201,8 @@ onMounted(() => {
         <div class="col-12 xl:col-12">
             <div class="card">
                 <h5>Produtos</h5>
+                <p>Vendas: {{ retriviedData.totalamount }} MT</p>
+                <Button label="Print" class="mr-2 mb-2" @click="downloadPDFProducts"><i class="pi pi-print"></i> Print</Button>
                 <DataTable :value="retriviedData.event.products" :rows="1" responsiveLayout="scroll">
                     <Column field="name" header="Nome" :sortable="true" style="width: 35%"></Column>
                     <Column field="barstore.name" header="Bar" :sortable="true" style="width: 35%">

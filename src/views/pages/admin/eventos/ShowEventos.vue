@@ -608,6 +608,7 @@ onMounted(() => {
                 <Column field="bi" sortable header="BI"></Column>
                 <Column field="user" sortable header="Usuário"></Column>
                 <Column field="password" sortable header="Password"></Column>
+                <Column field="tickets_count" sortable header="Bilhetes Validados"></Column>
                 <Column header="Ações">
                     <template #body="slotProps">
                         <router-link :to="'/admin/eventos/' + retriviedData.id + '/protocolos/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>

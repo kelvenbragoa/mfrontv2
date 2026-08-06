@@ -25,15 +25,15 @@ const smoothScroll = (id) => {
                         <a class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Perguntas Frequentes</a>
                     </div>
                     <div class="col-12 md:col-3 mt-4 md:mt-0">
-                        <h4 class="font-medium text-2xl line-height-3 mb-3 text-900">Aspectos Legais</h4>
-                        <a class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Políticas de Privacidade</a>
-                        <a class="line-height-3 text-xl block cursor-pointer text-700">Termos de Serviço</a>
+                        <router-link to="/privacy" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Aspectos Legais</router-link>
+                        <router-link to="/privacy" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Políticas de Privacidade</router-link>
+                        <router-link to="/privacy" class="line-height-3 text-xl block cursor-pointer text-700">Termos de Serviço</router-link>
                     </div>
                     <div class="col-12 md:col-5 mt-4 md:mt-0">
                         <h4 class="font-medium text-2xl line-height-3 mb-3 text-900">Suporte</h4>
                         <a class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Entre em contacto</a>
                         <a class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Email: suporte@mticket.co.mz</a>
-                        <a class="line-height-3 text-xl block cursor-pointer text-700">Telefone:+258 842648618 / 842280974</a>
+                        <a class="line-height-3 text-xl block cursor-pointer text-700">Telefone:+258 842280974 / 842648618</a>
                     </div>
                 </div>
             </div>

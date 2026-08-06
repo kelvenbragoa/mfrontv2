@@ -20,7 +20,6 @@ const invites = ref([]);
 const loadingButtonDelete = ref(false);
 const dataIdBeingDeleted = ref(0);
 
-
 //DIALOG
 const displayCreateInvite = ref(false);
 const openCreateInvite = () => {
@@ -30,20 +29,28 @@ const closeCreateInvite = () => {
     displayCreateInvite.value = false;
 };
 
+//DIALOG
+const displayCreateInviteBulk = ref(false);
+const openCreateInviteBulk = () => {
+    displayCreateInviteBulk.value = true;
+};
+const closeCreateInviteBulk = () => {
+    displayCreateInviteBulk.value = false;
+};
+
 function goBackUsingBack() {
     if (router) {
         router.back();
     }
 }
-const schema = yup.object({
-
-});
+const schema = yup.object({});
 
 const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
     validationSchema: schema
 });
 
 const name = ref();
+const end = ref(1);
 
 const fields = ref(null);
 
@@ -65,6 +72,38 @@ const onSubmitCustomer = () => {
             name.value = '';
             isLoadingButton.value = false;
             closeCreateInvite();
+        })
+        .catch((error) => {
+            isLoadingButton.value = false;
+            toast.add({ severity: 'error', summary: `${error.response.data.message}`, detail: 'Detalhe da Mensagem', life: 3000 });
+            if (error.response.data.errors) {
+                setErrors(error.response.data.errors);
+            }
+        })
+        .finally(() => {
+            // isLoadingButton.value = false;
+        });
+};
+
+const onSubmitCustomerBulk = () => {
+    fields.value = {
+        name: name.value,
+        event_id: retriviedData.value.event_id,
+        invite_id: retriviedData.value.id,
+        end: end.value,
+        status: 1
+    };
+    isLoadingButton.value = true;
+    axios
+        .post(`${baseURL}/promotor-customers-bulk`, fields.value)
+        .then((response) => {
+            // router.push({ path: '/deliveries' });
+            // retriviedData.value = response.data.event;
+            toast.add({ severity: 'success', summary: `Successo`, detail: 'Convidado criado com sucesso', life: 3000 });
+            getData();
+            name.value = '';
+            isLoadingButton.value = false;
+            closeCreateInviteBulk();
         })
         .catch((error) => {
             isLoadingButton.value = false;
@@ -176,6 +215,7 @@ onMounted(() => {
             <!-- /promotor/eventos/:id/bilhetes/create -->
 
             <Button @click.prevent="openCreateInvite()" label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Convidados </Button>
+            <Button @click.prevent="openCreateInviteBulk()" label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Convidados Em Massa </Button>
             <p>Esta tabela de Convidados contem {{ customer.length }} Registros.</p>
             <DataTable :value="customer" tableStyle="min-width: 50rem">
                 <template #header>
@@ -191,10 +231,15 @@ onMounted(() => {
                 </Column>
 
                 <Column field="name" sortable header="Nome"></Column>
-                <Column field="status" sortable header="Estado"></Column>
+                <Column field="status" header="Estado">
+                    <template #body="slotProps">
+                        <Tag severity="success" v-if="slotProps.data.status == 1">Válido</Tag>
+                        <Tag severity="danger" v-if="slotProps.data.status == 0">Inválido</Tag>
+                    </template>
+                </Column>
                 <Column header="Ações">
                     <template #body="slotProps">
-                        <router-link :to="'/promotor/eventos/' + retriviedData.id + '/convites/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
+                        <router-link :to="'/promotor/eventos/' + retriviedData.event_id + '/convites/' + slotProps.data.invite_id + '/cliente/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
                         <a href="#" @click.prevent="confirmDeletionInvite(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
                     </template>
                 </Column>
@@ -227,6 +272,47 @@ onMounted(() => {
             <Button label="Sim" icon="pi pi-check" @click="onSubmitCreateTicket" class="p-button-text" autofocus />
         </template>
     </Dialog>
+
+    <Dialog header="Convidado Em Massa" v-model:visible="displayCreateInviteBulk" :style="{ width: '350px' }" :modal="true">
+        <div class="flex align-items-center justify-content-center">
+            <form @submit="onSubmitCustomerBulk">
+                <div class="col-12 md:col-12">
+                    <div class="card p-fluid">
+                        <h5>Adicionar Convidados em massa</h5>
+                        <div class="field">
+                            <label for="name">Nome no convite</label>
+                            <InputText v-model="name" id="name" required type="text" :class="{ 'p-invalid': errors.name }" />
+                        </div>
+                        <div class="field">
+                            <InputNumber v-model="end" showButtons buttonLayout="horizontal" :min="0" :max="100" :disabled="isLoadingButton">
+                                <template #incrementbuttonicon>
+                                    <span class="pi pi-plus" />
+                                </template>
+                                <template #decrementbuttonicon>
+                                    <span class="pi pi-minus" />
+                                </template>
+                            </InputNumber>
+                        </div>
+                        <!-- <div class="field">
+                            <label for="start">Inicio</label>
+                            <InputNumber v-model="start" :min="1" id="start" required type="number" :class="{ 'p-invalid': errors.start }" />
+                        </div>
+                        <div class="field">
+                            <label for="end">Fim</label>
+                            <InputNumber v-model="end" id="end" :min="1" required type="number" :class="{ 'p-invalid': errors.end }" />
+                        </div> -->
+                    </div>
+                    <Button label="Submeter" class="mr-2 mb-2" @click="onSubmitCustomerBulk" :disabled="isLoadingButton"></Button>
+                    <ProgressSpinner style="width: 35px; height: 35px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" v-if="isLoadingButton" />
+                </div>
+            </form>
+        </div>
+        <template #footer>
+            <Button label="Não" icon="pi pi-times" @click="closeCreateInviteBulk" class="p-button-text" />
+            <Button label="Sim" icon="pi pi-check" @click="onSubmitCreateTicketBulk" class="p-button-text" autofocus />
+        </template>
+    </Dialog>
+
     <Dialog header="Confirmação" v-model:visible="displayConfirmationInvite" :style="{ width: '350px' }" :modal="true">
         <div class="flex align-items-center justify-content-center">
             <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />

@@ -118,7 +118,7 @@ onMounted(() => {
 
                     <div class="grid">
                         <div class="col-12 lg:col-6 xl:col-4" v-for="event in retriviedData.events.data" :key="event.id">
-                            <router-link :to="'/eventos/' + event.id" style="text-decoration: none; color: inherit">
+                            <router-link :to="'/eventos/' + event.slug" style="text-decoration: none; color: inherit">
                                 <div class="border-4 surface-border border-round m-3">
                                     <div class="mb-3">
                                         <div class="relative mx-auto">
