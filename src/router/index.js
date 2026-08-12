@@ -5,7 +5,9 @@ import AppAdminLayout from '@/layoutadmin/AppAdminLayout.vue';
 import AppHomeLayout from '@/layouthome/AppHomeLayout.vue';
 import {
     getCurrentPromotorSlug,
+    getMainSiteUrl,
     getPromotorPublicUrl,
+    isSubdomainAllowedRoute,
     shouldUseSubdomainUrls
 } from '@/utils/promotorHost';
 
@@ -823,6 +825,11 @@ router.beforeEach((to) => {
             return false;
         }
         return { name: 'homepage', replace: true };
+    }
+
+    if (!isSubdomainAllowedRoute(to.name)) {
+        window.location.href = getMainSiteUrl(to.fullPath);
+        return false;
     }
 
     return true;

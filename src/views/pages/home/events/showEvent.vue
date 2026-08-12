@@ -5,12 +5,13 @@ import axios from 'axios';
 import { baseURL, storageURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
-import { getPromotorPublicUrl, openPromotorPage, shouldUseSubdomainUrls } from '@/utils/promotorHost';
+import { getPromotorPublicUrl, openPromotorPage, shouldUseSubdomainUrls, getCurrentPromotorSlug, getEventPublicUrl, getMainSiteUrl } from '@/utils/promotorHost';
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToast();
 const useSubdomainLinks = shouldUseSubdomainUrls();
+const hostPromotorSlug = getCurrentPromotorSlug();
 
 const isLoadingDiv = ref(true);
 const notFound = ref(false);
@@ -111,7 +112,15 @@ const getData = async () => {
 
     try {
         const response = await axios.get(`${baseURL}/eventos/${route.params.id}`);
-        event.value = response.data.events;
+        const loaded = response.data.events;
+
+        // On a promoter subdomain, only keep that promoter's events here.
+        if (hostPromotorSlug && loaded?.user?.slug && loaded.user.slug !== hostPromotorSlug) {
+            window.location.href = getMainSiteUrl(`/eventos/${loaded.slug || route.params.id}`);
+            return;
+        }
+
+        event.value = loaded;
         recommended.value = response.data.recommended || response.data.event_recomended || [];
     } catch (error) {
         if (error?.response?.status === 404) {
@@ -152,9 +161,12 @@ watch(() => route.params.id, getData);
         <div class="empty-block">
             <h2 class="text-900 mt-0 mb-2">Evento não encontrado</h2>
             <p class="text-600 mb-3">Este evento pode ter sido removido ou o link está incorreto.</p>
-            <router-link to="/eventos">
+            <router-link v-if="!hostPromotorSlug" to="/eventos">
                 <Button label="Ver todos os eventos" class="p-button-rounded border-none font-medium text-white bg-blue-500" />
             </router-link>
+            <a v-else :href="getMainSiteUrl('/eventos')">
+                <Button label="Ver todos os eventos" class="p-button-rounded border-none font-medium text-white bg-blue-500" />
+            </a>
         </div>
     </div>
 
@@ -162,7 +174,11 @@ watch(() => route.params.id, getData);
         <section class="event-hero" :style="heroBackground ? { '--hero-image': `url('${heroBackground}')` } : null">
             <div class="event-hero__veil" />
             <div class="event-hero__content px-4 lg:px-8 mx-0 lg:mx-8">
-                <router-link to="/eventos" class="event-hero__back">
+                <router-link v-if="hostPromotorSlug" to="/" class="event-hero__back">
+                    <i class="pi pi-arrow-left mr-2" />
+                    Voltar ao promotor
+                </router-link>
+                <router-link v-else to="/eventos" class="event-hero__back">
                     <i class="pi pi-arrow-left mr-2" />
                     Eventos
                 </router-link>
@@ -332,7 +348,10 @@ watch(() => route.params.id, getData);
                         </router-link>
                         <Button v-else label="Vendas encerradas" class="w-full p-button-rounded" disabled />
 
-                        <router-link to="/eventos" class="w-full mt-2 block">
+                        <router-link v-if="hostPromotorSlug" to="/" class="w-full mt-2 block">
+                            <Button label="Voltar ao promotor" class="w-full p-button-rounded p-button-outlined" />
+                        </router-link>
+                        <router-link v-else to="/eventos" class="w-full mt-2 block">
                             <Button label="Ver mais eventos" class="w-full p-button-rounded p-button-outlined" />
                         </router-link>
                     </aside>
@@ -346,7 +365,7 @@ watch(() => route.params.id, getData);
 
             <div class="grid">
                 <div class="col-12 md:col-6 xl:col-3" v-for="item in recommended" :key="item.id">
-                    <router-link :to="'/eventos/' + item.slug" class="event-card">
+                    <a :href="getEventPublicUrl(item.slug, item.user?.slug)" class="event-card">
                         <div class="event-card__media">
                             <img
                                 :src="imageSrc(item)"
@@ -380,7 +399,7 @@ watch(() => route.params.id, getData);
                                 <Tag v-if="item.type?.name" :value="item.type.name" severity="info" />
                             </div>
                         </div>
-                    </router-link>
+                    </a>
                 </div>
             </div>
         </section>

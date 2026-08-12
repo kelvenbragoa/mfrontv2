@@ -21,6 +21,15 @@ const RESERVED_SUBDOMAINS = new Set([
     'autodiscover'
 ]);
 
+/** Routes that may stay on a promoter subdomain. */
+const SUBDOMAIN_ALLOWED_ROUTE_NAMES = new Set([
+    'homepage',
+    'eventos',
+    'checkout',
+    'encomenda',
+    'promotor.public'
+]);
+
 export function getHostname() {
     if (typeof window === 'undefined') return '';
     return window.location.hostname.toLowerCase();
@@ -53,6 +62,26 @@ export function shouldUseSubdomainUrls(hostname = getHostname()) {
     return isProductionFamilyHost(hostname);
 }
 
+export function getMainSiteOrigin() {
+    return `https://${PRODUCTION_ROOT}`;
+}
+
+export function getMainSiteUrl(path = '/') {
+    const normalized = path.startsWith('/') ? path : `/${path}`;
+    if (!isPromotorSubdomain()) {
+        return normalized;
+    }
+    return `${getMainSiteOrigin()}${normalized}`;
+}
+
+export function leaveToMainSite(path = '/') {
+    window.location.href = getMainSiteUrl(path);
+}
+
+export function isSubdomainAllowedRoute(routeName) {
+    return SUBDOMAIN_ALLOWED_ROUTE_NAMES.has(routeName);
+}
+
 export function getPromotorPublicUrl(slug, hostname = getHostname()) {
     if (!slug) return null;
 
@@ -81,7 +110,7 @@ export function openPromotorPage(slug, router) {
     if (shouldUseSubdomainUrls()) {
         const current = getCurrentPromotorSlug();
         if (current === slug) {
-            router?.push('/') ;
+            router?.push('/');
             return;
         }
         window.location.href = getPromotorPublicUrl(slug);
@@ -91,4 +120,24 @@ export function openPromotorPage(slug, router) {
     router?.push(`/p/${slug}`);
 }
 
-export { PRODUCTION_ROOT, RESERVED_SUBDOMAINS };
+/**
+ * Event URL: stay on subdomain only when the event belongs to the current tenant.
+ */
+export function getEventPublicUrl(eventSlug, eventPromotorSlug = null) {
+    if (!eventSlug) return null;
+
+    const path = `/eventos/${eventSlug}`;
+    const hostSlug = getCurrentPromotorSlug();
+
+    if (hostSlug && eventPromotorSlug && eventPromotorSlug === hostSlug) {
+        return path;
+    }
+
+    if (hostSlug) {
+        return getMainSiteUrl(path);
+    }
+
+    return path;
+}
+
+export { PRODUCTION_ROOT, RESERVED_SUBDOMAINS, SUBDOMAIN_ALLOWED_ROUTE_NAMES };

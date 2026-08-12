@@ -6,7 +6,7 @@ import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { debounce } from 'lodash';
-import { getCurrentPromotorSlug } from '@/utils/promotorHost';
+import { getCurrentPromotorSlug, getMainSiteUrl } from '@/utils/promotorHost';
 
 const route = useRoute();
 const toast = useToast();
@@ -182,9 +182,9 @@ onMounted(() => getData(1));
             <i class="pi pi-user text-4xl text-blue-500 mb-3" />
             <h3 class="text-900 mt-0 mb-2">Promotor não encontrado</h3>
             <p class="text-600 mb-3">Este link não corresponde a nenhuma página de promotor.</p>
-            <router-link to="/eventos">
+            <a :href="getMainSiteUrl('/eventos')">
                 <Button label="Ver todos os eventos" class="p-button-rounded border-none font-medium text-white bg-blue-500" />
-            </router-link>
+            </a>
         </div>
     </div>
 
