@@ -1,1 +1,0 @@
-import{P as r}from"./ProfilePage-e85db6b4.js";import{a as e,g as o}from"./index-f8a4e567.js";import"./APIConstant-bb4f663e.js";import"./index.esm-9dcc60b8.js";import"./_commonjsHelpers-725317a4.js";const n={__name:"IndexProfile",setup(t){return(a,i)=>(e(),o(r,{"default-role-label":"Administrador"}))}};export{n as default};

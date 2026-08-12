@@ -1,1 +1,0 @@
-import{s as e,a as t,g as o}from"./index-f8a4e567.js";import{I as r}from"./InvitesDashboard-4d92166a.js";import"./APIConstant-bb4f663e.js";import"./moment-a9aaa855.js";const h={__name:"IndexDashboardConvites",setup(s){const a=`/admin/eventos/${e().currentRoute.value.params.id}/dashboard`;return(d,c)=>(t(),o(r,{"dashboard-path":a}))}};export{h as default};

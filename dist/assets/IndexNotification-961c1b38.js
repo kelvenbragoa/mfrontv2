@@ -1,0 +1,1 @@
+import{N as o}from"./NotificationsPage-13cc8795.js";import{a as t,g as a}from"./index-8d75f931.js";import"./ApiConstant-fad94e1c.js";import"./moment-a9aaa855.js";const m={__name:"IndexNotification",setup(r){return(e,i)=>(t(),a(o))}};export{m as default};

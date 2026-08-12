@@ -1,1 +1,0 @@
-import{E as a}from"./EventDashboard-92569831.js";import{a as o,g as r}from"./index-f8a4e567.js";import"./APIConstant-bb4f663e.js";import"./moment-a9aaa855.js";const _={__name:"Dashboard",setup(t){return(e,s)=>(o(),r(a,{scope:"admin"}))}};export{_ as default};
