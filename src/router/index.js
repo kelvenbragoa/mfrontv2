@@ -56,6 +56,22 @@ const router = createRouter({
                     component: () => import('@/views/pages/admin/tickets/ShowTickets.vue')
                 },
                 {
+                    path: '/admin/utilizadores',
+                    name: 'admin.utilizadores',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/users/IndexUsers.vue')
+                },
+                {
+                    path: '/admin/utilizadores/:id',
+                    name: 'admin.utilizadores.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/users/ShowUser.vue')
+                },
+                {
                     path: '/admin/transacoes/:id/edit',
                     name: 'admin.transacoes.edit',
                     meta: {
@@ -202,6 +218,46 @@ const router = createRouter({
                         requiresAuth: true
                     },
                     component: () => import('@/views/pages/admin/eventos/bar/ShowBar.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/bar/:idbar/stock/entrada',
+                    name: 'admin.eventos.show.bar.stock.entrada',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/stock/CreateEntrada.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/bar/:idbar/stock/saida',
+                    name: 'admin.eventos.show.bar.stock.saida',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/stock/CreateSaida.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/bar/:idbar/stock/transferencia',
+                    name: 'admin.eventos.show.bar.stock.transferencia',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/stock/CreateTransferencia.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/bar/:idbar/stock/inventario',
+                    name: 'admin.eventos.show.bar.stock.inventario',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/stock/CreateInventario.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/stock/:noteId',
+                    name: 'admin.eventos.show.stock.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/stock/ShowStockNote.vue')
                 },
                 //protocolo
                 {
@@ -521,6 +577,46 @@ const router = createRouter({
                         requiresAuth: true
                     },
                     component: () => import('@/views/pages/promotor/eventos/bar/ShowBar.vue')
+                },
+                {
+                    path: '/promotor/eventos/:id/bar/:idbar/stock/entrada',
+                    name: 'promotor.eventos.show.bar.stock.entrada',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/stock/CreateEntrada.vue')
+                },
+                {
+                    path: '/promotor/eventos/:id/bar/:idbar/stock/saida',
+                    name: 'promotor.eventos.show.bar.stock.saida',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/stock/CreateSaida.vue')
+                },
+                {
+                    path: '/promotor/eventos/:id/bar/:idbar/stock/transferencia',
+                    name: 'promotor.eventos.show.bar.stock.transferencia',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/stock/CreateTransferencia.vue')
+                },
+                {
+                    path: '/promotor/eventos/:id/bar/:idbar/stock/inventario',
+                    name: 'promotor.eventos.show.bar.stock.inventario',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/stock/CreateInventario.vue')
+                },
+                {
+                    path: '/promotor/eventos/:id/stock/:noteId',
+                    name: 'promotor.eventos.show.stock.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/stock/ShowStockNote.vue')
                 },
                 //protocolo
                 {

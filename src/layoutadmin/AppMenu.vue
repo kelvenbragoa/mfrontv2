@@ -12,8 +12,9 @@ const model = ref([
         label: 'Gestão',
         items: [
             { label: 'Eventos', icon: 'pi pi-fw pi-list', to: '/admin/eventos' },
+            { label: 'Utilizadores', icon: 'pi pi-fw pi-users', to: '/admin/utilizadores' },
             { label: 'Transações', icon: 'pi pi-fw pi-chart-bar', to: '/admin/transacoes' },
-            { label: 'Tickets', icon: 'pi pi-fw pi-chart-bar', to: '/admin/tickets' },
+            { label: 'Tickets', icon: 'pi pi-fw pi-ticket', to: '/admin/tickets' },
 
             // { label: 'Form Layout', icon: 'pi pi-fw pi-id-card', to: '/uikit/formlayout' },
             // { label: 'Input', icon: 'pi pi-fw pi-check-square', to: '/uikit/input' },

@@ -30,27 +30,8 @@ const schema = yup.object({
     name: yup.string().required().trim().label('Nome'),
     sell_price: yup.string().required().trim().label('Preco'),
     buy_price: yup.string().required().trim().label('Preco'),
-    qtd: yup.string().required().trim().label('Preco'),
-    bar_store_id: yup.string().required().trim().label('Preco'),
-
-    // description: yup.string().required().trim().label('Descricao'),
-    // max_qtd: yup.string().required().label('Quantidade'),
+    bar_store_id: yup.string().required().trim().label('Bar'),
     event_id: yup.string().required().label('Evento'),
-    // start_date: yup.string().required().label('Data'),
-    // start_time: yup.string().required().label('Horas'),
-    // end_date: yup.string().required().label('Data'),
-    // end_time: yup.string().required().label('Horas')
-
-    // email: yup.string().required().email().label('Email province_id'),
-    // fullName: yup.string().required().label('Full name'),
-    // password: yup.string().required().min(6).label('Password'),
-    // passwordConfirm: yup
-    //     .string()
-    //     .oneOf([yup.ref('password')], 'Passwords must match')
-    //     .required()
-    //     .label('Password confirmation'),
-    // terms: yup.boolean().required().isTrue('You must agree to terms and conditions').label('terms agreement'),
-    // type: yup.string().required().label('Account type')
 });
 
 const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
@@ -59,7 +40,6 @@ const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
 
 const [name] = defineField('name');
 const [event_id] = defineField('event_id');
-const [qtd] = defineField('qtd');
 const [sell_price] = defineField('sell_price');
 const [buy_price] = defineField('buy_price');
 const [bar_store_id] = defineField('bar_store_id');
@@ -102,18 +82,10 @@ const getData = () => {
             retriviedData.value = response.data.product;
             name.value = retriviedData.value.name;
             event_id.value = retriviedData.value.event_id;
-            // start_time.value = retriviedData.value.start_time;
-            // end_time.value = retriviedData.value.end_time;
-            // start_date.value = retriviedData.value.start_date;
-            // end_date.value = retriviedData.value.end_date;
-            qtd.value = retriviedData.value.qtd;
             sell_price.value = retriviedData.value.sell_price;
             buy_price.value = retriviedData.value.buy_price;
             bar_store_id.value = retriviedData.value.bar_store_id;
             bars.value = response.data.bar;
-
-            // description.value = retriviedData.value.description;
-
 
             isLoadingDiv.value = false;
         })
@@ -158,10 +130,10 @@ onMounted(() => {
                             <InputText v-model="sell_price" id="sell_price" type="text" :class="{ 'p-invalid': errors.sell_price }" />
                             <small id="sell_price-help" class="p-error">{{ errors.sell_price }}</small>
                         </div>
-                        <div class="field">
-                            <label for="qtd">Quantidade</label>
-                            <InputText v-model="qtd" id="qtd" type="text" :class="{ 'p-invalid': errors.qtd }" />
-                            <small id="qtd-help" class="p-error">{{ errors.qtd }}</small>
+                        <div class="field" v-if="retriviedData">
+                            <label>Stock actual</label>
+                            <InputText :modelValue="String(retriviedData.qtd ?? 0)" disabled />
+                            <small class="text-600">Para alterar stock usa nota de entrada/saída no bar.</small>
                         </div>
                         <div class="field">
                             <label for="bar_store_id">Bar</label>

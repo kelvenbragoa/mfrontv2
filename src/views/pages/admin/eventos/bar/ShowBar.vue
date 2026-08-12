@@ -16,6 +16,7 @@ const isLoadingButton = ref(false);
 const retriviedData = ref();
 const toast = useToast();
 const products = ref([]);
+const stockNotes = ref([]);
 const cities = ref([]);
 const typeevent = ref([]);
 const categories = ref([]);
@@ -116,6 +117,19 @@ const deleteDataProduct = () => {
         });
 };
 
+const loadStockNotes = (eventId, barId) => {
+    axios
+        .get(`${baseURL}/promotor-stock-notes`, {
+            params: { event_id: eventId, bar_store_id: barId, per_page: 10 }
+        })
+        .then((response) => {
+            stockNotes.value = response.data?.notes?.data || [];
+        })
+        .catch(() => {
+            stockNotes.value = [];
+        });
+};
+
 const getData = () => {
     axios
         .get(`${baseURL}/promotor-bar/${router.currentRoute.value.params.idbar}`)
@@ -123,6 +137,7 @@ const getData = () => {
             // toast.add({ severity: 'success', summary: 'Success Message', detail: 'Message Detail', life: 3000 });
             retriviedData.value = response.data.bar;
             products.value = response.data.products;
+            loadStockNotes(retriviedData.value.event_id, retriviedData.value.id);
             // provinces.value = response.data.province;
             // cities.value = response.data.city;
             // categories.value = response.data.category;
@@ -152,9 +167,23 @@ onMounted(() => {
             <p><strong>Nome: </strong>{{ retriviedData.name }}</p>
             <p><strong>Produtos: </strong>{{ retriviedData.products.length }}</p>
             <hr>
-            <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/produtos/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Produto </Button>
-            </router-link>
+            <div class="flex flex-wrap gap-2 mb-3">
+                <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/produtos/create'">
+                    <Button label="Criar Produto" class="mr-2 mb-2" icon="pi pi-plus" />
+                </router-link>
+                <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/bar/' + retriviedData.id + '/stock/entrada'">
+                    <Button label="Nota de entrada" class="mr-2 mb-2" icon="pi pi-plus-circle" severity="success" />
+                </router-link>
+                <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/bar/' + retriviedData.id + '/stock/saida'">
+                    <Button label="Nota de saída" class="mr-2 mb-2" icon="pi pi-minus-circle" severity="warn" />
+                </router-link>
+                <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/bar/' + retriviedData.id + '/stock/transferencia'">
+                    <Button label="Transferir" class="mr-2 mb-2" icon="pi pi-arrows-h" severity="info" />
+                </router-link>
+                <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/bar/' + retriviedData.id + '/stock/inventario'">
+                    <Button label="Inventário" class="mr-2 mb-2" icon="pi pi-check-square" severity="secondary" />
+                </router-link>
+            </div>
             <p>Esta tabela de Produtos contem {{ products.length }} Registros.</p>
             <DataTable :value="products" tableStyle="min-width: 50rem">
                 <template #header>
@@ -180,7 +209,59 @@ onMounted(() => {
                         <a href="#" @click.prevent="confirmDeletionProduct(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
                     </template>
                 </Column>
-                <template #footer> No total são {{ products.length }} Bares. </template>
+                <template #footer> No total são {{ products.length }} produtos. </template>
+            </DataTable>
+
+            <hr class="mt-4" />
+            <h5>Notas de stock recentes</h5>
+            <DataTable :value="stockNotes" tableStyle="min-width: 40rem" class="p-datatable-sm">
+                <Column header="#">
+                    <template #body="slotProps">{{ slotProps.data.id }}</template>
+                </Column>
+                <Column header="Tipo">
+                    <template #body="slotProps">
+                        <Tag
+                            :value="
+                                slotProps.data.type === 'entry'
+                                    ? 'Entrada'
+                                    : slotProps.data.type === 'exit'
+                                      ? 'Saída'
+                                      : slotProps.data.type === 'inventory'
+                                        ? 'Inventário'
+                                        : 'Transferência'
+                            "
+                            :severity="
+                                slotProps.data.type === 'entry'
+                                    ? 'success'
+                                    : slotProps.data.type === 'exit'
+                                      ? 'warn'
+                                      : slotProps.data.type === 'inventory'
+                                        ? 'secondary'
+                                        : 'info'
+                            "
+                        />
+                    </template>
+                </Column>
+                <Column header="Referência">
+                    <template #body="slotProps">
+                        <span v-if="slotProps.data.type === 'transfer'">
+                            {{ slotProps.data.barstore?.name || '—' }} → {{ slotProps.data.to_barstore?.name || '—' }}
+                        </span>
+                        <span v-else>{{ slotProps.data.reference || '--' }}</span>
+                    </template>
+                </Column>
+                <Column header="Linhas" field="items_count" />
+                <Column header="Data">
+                    <template #body="slotProps">{{ moment(slotProps.data.confirmed_at || slotProps.data.created_at).format('DD/MM/YYYY HH:mm') }}</template>
+                </Column>
+                <Column header="">
+                    <template #body="slotProps">
+                        <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/stock/' + slotProps.data.id">
+                            <i class="pi pi-eye"></i>
+                        </router-link>
+                    </template>
+                </Column>
+                <template #empty>Ainda sem notas de stock neste bar.</template>
             </DataTable>
         </div>
     </div>

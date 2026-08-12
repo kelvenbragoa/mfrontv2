@@ -27,28 +27,10 @@ function goBackUsingBack() {
 }
 const schema = yup.object({
     name: yup.string().required().trim().label('Nome'),
-    // price: yup.string().required().trim().label('Preco'),
-    // description: yup.string().required().trim().label('Descricao'),
-    buy_price: yup.string().required().label('Quantidade'),
-    sell_price: yup.string().required().label('Quantidade'),
-    qtd: yup.string().required().label('Quantidade'),
+    buy_price: yup.string().required().label('Preço de compra'),
+    sell_price: yup.string().required().label('Preço de venda'),
     event_id: yup.string().required().label('Evento'),
-    bar_store_id: yup.string().required().label('Evento'),
-    // start_date: yup.string().required().label('Data'),
-    // start_time: yup.string().required().label('Horas'),
-    // end_date: yup.string().required().label('Data'),
-    // end_time: yup.string().required().label('Horas')
-
-    // email: yup.string().required().email().label('Email province_id'),
-    // fullName: yup.string().required().label('Full name'),
-    // password: yup.string().required().min(6).label('Password'),
-    // passwordConfirm: yup
-    //     .string()
-    //     .oneOf([yup.ref('password')], 'Passwords must match')
-    //     .required()
-    //     .label('Password confirmation'),
-    // terms: yup.boolean().required().isTrue('You must agree to terms and conditions').label('terms agreement'),
-    // type: yup.string().required().label('Account type')
+    bar_store_id: yup.string().required().label('Bar'),
 });
 
 const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
@@ -58,13 +40,8 @@ const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
 const [name] = defineField('name');
 const [event_id] = defineField('event_id');
 const [sell_price] = defineField('sell_price');
-const [qtd] = defineField('qtd');
 const [buy_price] = defineField('buy_price');
 const [bar_store_id] = defineField('bar_store_id');
-// const [end_date] = defineField('end_date');
-// const [end_time] = defineField('end_time');
-// const [price] = defineField('price');
-
 
 
 const onSubmit = handleSubmit((values) => {
@@ -147,11 +124,7 @@ onMounted(() => {
                             <InputText v-model="sell_price" id="sell_price" type="text" :class="{ 'p-invalid': errors.sell_price }" />
                             <small id="sell_price-help" class="p-error">{{ errors.sell_price }}</small>
                         </div>
-                        <div class="field">
-                            <label for="qtd">Quantidade</label>
-                            <InputText v-model="qtd" id="qtd" type="text" :class="{ 'p-invalid': errors.qtd }" />
-                            <small id="qtd-help" class="p-error">{{ errors.qtd }}</small>
-                        </div>
+                        <small class="text-600 mb-3 block">O stock começa em 0. Usa uma <strong>nota de entrada</strong> no bar para adicionar quantidades.</small>
                         <div class="field">
                             <label for="bar_store_id">Bar</label>
                             <Dropdown v-model="bar_store_id" :options="bars"  optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.province_id }" />
