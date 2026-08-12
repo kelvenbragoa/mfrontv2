@@ -1,64 +1,57 @@
 <script setup>
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import { baseURL } from '@/service/ApiConstant';
-import { onMounted, ref } from 'vue';
 import axios from 'axios';
 import { useForm } from 'vee-validate';
 import * as yup from 'yup';
 import { useToast } from 'primevue/usetoast';
-import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
 
 const router = useRouter();
-const isLoadingDiv = ref(true);
-const isLoadingButton = ref(false);
+const toast = useToast();
+
+const isLoading = ref(true);
+const loadError = ref(null);
+const isSubmitting = ref(false);
 const provinces = ref([]);
 const cities = ref([]);
 const typeevent = ref([]);
 const categories = ref([]);
-const toast = useToast();
+const imageFile = ref(null);
+const imagePreview = ref(null);
 
-function goBackUsingBack() {
-    if (router) {
-        router.back();
-    }
-}
 const schema = yup.object({
     name: yup.string().required().trim().label('Nome'),
-    province_id: yup.string().required().trim().label('Provincia'),
-    city_id: yup.string().required().trim().label('Cidade'),
-    description: yup.string().required().label('Descricao'),
-    main_category_id: yup.string().required().label('CategoriaPrincipal'),
-    second_category_id: yup.string().required().label('CategoriaSec'),
-    type_event_id: yup.string().required().label('Province'),
-    address: yup.string().required().label('Province'),
-    start_date: yup.string().required().label('Province'),
-    start_time: yup.string().required().label('Province'),
-    end_date: yup.string().required().label('Province'),
-    end_time: yup.string().required().label('Province'),
-    email: yup.string().required().label('Province'),
-    phone: yup.string().required().label('Province'),
-    website: yup.string().required().label('Province'),
-    instagram: yup.string().required().label('Province'),
-    facebook: yup.string().required().label('Province'),
-    twitter: yup.string().required().label('Province'),
-    youtube: yup.string().required().label('Province'),
-
-
-    // email: yup.string().required().email().label('Email province_id'),
-    // fullName: yup.string().required().label('Full name'),
-    // password: yup.string().required().min(6).label('Password'),
-    // passwordConfirm: yup
-    //     .string()
-    //     .oneOf([yup.ref('password')], 'Passwords must match')
-    //     .required()
-    //     .label('Password confirmation'),
-    // terms: yup.boolean().required().isTrue('You must agree to terms and conditions').label('terms agreement'),
-    // type: yup.string().required().label('Account type')
+    province_id: yup.mixed().required().label('Província'),
+    city_id: yup.mixed().required().label('Cidade'),
+    description: yup.string().required().trim().label('Descrição'),
+    main_category_id: yup.mixed().required().label('Categoria principal'),
+    second_category_id: yup.mixed().nullable().label('Categoria secundária'),
+    type_event_id: yup.mixed().required().label('Tipo de evento'),
+    address: yup.string().required().trim().label('Endereço'),
+    start_date: yup.string().required().label('Data de início'),
+    start_time: yup.string().required().label('Hora de início'),
+    end_date: yup.string().required().label('Data de fim'),
+    end_time: yup.string().required().label('Hora de fim'),
+    email: yup.string().required().email().trim().label('Email'),
+    phone: yup.string().required().trim().label('Telefone'),
+    website: yup.string().nullable().trim().label('Website'),
+    instagram: yup.string().nullable().trim().label('Instagram'),
+    facebook: yup.string().nullable().trim().label('Facebook'),
+    twitter: yup.string().nullable().trim().label('Twitter'),
+    youtube: yup.string().nullable().trim().label('YouTube')
 });
 
-const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
-    validationSchema: schema
+const { defineField, handleSubmit, errors, setErrors, setFieldValue } = useForm({
+    validationSchema: schema,
+    initialValues: {
+        website: '',
+        instagram: '',
+        facebook: '',
+        twitter: '',
+        youtube: '',
+        second_category_id: null
+    }
 });
 
 const [name] = defineField('name');
@@ -80,219 +73,385 @@ const [instagram] = defineField('instagram');
 const [facebook] = defineField('facebook');
 const [twitter] = defineField('twitter');
 const [youtube] = defineField('youtube');
-const image = ref();
 
-const onSubmit = handleSubmit((values) => {
-    if (image.value != null) {
-        values.image = image.value;
-    }
-    isLoadingButton.value = true;
-    axios
-        .post(`${baseURL}/promotor-eventos`, values,{
-            headers: {
-            'Content-Type': 'multipart/form-data'
-          }
-        })
-        .then((response) => {
-            resetForm();
-            router.push({ path: '/promotor/eventos' });
-            toast.add({ severity: 'success', summary: `Successo`, detail: 'Evento criado com sucesso', life: 3000 });
-        })
-        .catch((error) => {
-            isLoadingButton.value = false;
-            toast.add({ severity: 'error', summary: `${error.response.data.message}`, detail: 'Detalhe da Mensagem', life: 3000 });
-            if (error.response.data.errors) {
-                setErrors(error.response.data.errors);
-            }
-        })
-        .finally(() => {
-            isLoadingButton.value = false;
-        });
+watch(province_id, () => {
+    setFieldValue('city_id', null);
 });
+
+const goBack = () => router.push('/promotor/eventos');
 
 const onFileUpload = (event) => {
-    image.value = event.files[0];
-    console.log(image.value);
+    const file = event.files?.[0];
+    if (!file) return;
+
+    imageFile.value = file;
+
+    if (imagePreview.value?.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview.value);
+    }
+    imagePreview.value = URL.createObjectURL(file);
 };
 
-const getCreateEvents = () => {
-    axios
-        .get(`${baseURL}/promotor-eventos/create`)
-        .then((response) => {
-            // toast.add({ severity: 'success', summary: 'Success Message', detail: 'Message Detail', life: 3000 });
-            provinces.value = response.data.province;
-            cities.value = response.data.city;
-            categories.value = response.data.category;
-            typeevent.value = response.data.typeevent;
-            isLoadingDiv.value = false;
-        })
-        .catch((error) => {
-            isLoadingDiv.value = false;
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            goBackUsingBack();
-        });
+const clearImage = () => {
+    if (imagePreview.value?.startsWith('blob:')) {
+        URL.revokeObjectURL(imagePreview.value);
+    }
+    imageFile.value = null;
+    imagePreview.value = null;
 };
+
+const onSubmit = handleSubmit(async (values) => {
+    isSubmitting.value = true;
+
+    const payload = {
+        ...values,
+        website: values.website || '',
+        instagram: values.instagram || '',
+        facebook: values.facebook || '',
+        twitter: values.twitter || '',
+        youtube: values.youtube || '',
+        second_category_id: values.second_category_id || values.main_category_id
+    };
+
+    if (imageFile.value) {
+        payload.image = imageFile.value;
+    }
+
+    try {
+        const response = await axios.post(`${baseURL}/promotor-eventos`, payload, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+
+        toast.add({
+            severity: 'success',
+            summary: 'Evento criado',
+            detail: 'O evento foi submetido e fica pendente de aprovação.',
+            life: 4000
+        });
+
+        const createdId = response.data?.id;
+        router.push(createdId ? `/promotor/eventos/${createdId}` : '/promotor/eventos');
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Não foi possível criar',
+            detail: error?.response?.data?.message || 'Verifica os campos e tenta novamente.',
+            life: 4000
+        });
+
+        if (error?.response?.data?.errors) {
+            setErrors(error.response.data.errors);
+        }
+    } finally {
+        isSubmitting.value = false;
+    }
+});
+
+const loadForm = async () => {
+    isLoading.value = true;
+    loadError.value = null;
+
+    try {
+        const response = await axios.get(`${baseURL}/promotor-eventos/create`);
+        provinces.value = response.data.province ?? [];
+        cities.value = response.data.city ?? [];
+        categories.value = response.data.category ?? [];
+        typeevent.value = response.data.typeevent ?? [];
+    } catch (error) {
+        const status = error?.response?.status;
+        loadError.value =
+            status === 401
+                ? 'A sessão expirou. Inicia sessão novamente.'
+                : 'Não foi possível carregar o formulário.';
+    } finally {
+        isLoading.value = false;
+    }
+};
+
+const hasImage = computed(() => !!imagePreview.value);
+
 onMounted(() => {
-    getCreateEvents();
+    loadForm();
 });
 </script>
+
 <template>
-    <div className="card" v-if="!isLoadingDiv">
-        <div class="col-12">
-            <div class="card-w-title">
-                <Button label="Voltar" class="mr-2 mb-2" @click="goBackUsingBack"><i class="pi pi-angle-left"></i> Voltar</Button>
-                <h5>Criar Evento</h5>
+    <div class="event-form-page">
+        <div class="flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+            <div>
+                <Button label="Voltar" icon="pi pi-angle-left" text class="mb-2 p-0" @click="goBack" />
+                <h4 class="m-0 text-900">Criar evento</h4>
+                <span class="text-600">Preenche os dados do evento. Fica pendente até aprovação.</span>
+            </div>
+        </div>
+
+        <div v-if="isLoading" class="card">
+            <Skeleton width="10rem" height="1.25rem" class="mb-4" />
+            <Skeleton v-for="n in 8" :key="`sk-${n}`" height="2.75rem" class="mb-3" />
+        </div>
+
+        <div v-else-if="loadError" class="card empty-state">
+            <i class="pi pi-exclamation-triangle text-4xl text-orange-500 mb-3" />
+            <h5 class="text-900 mb-2">Formulário indisponível</h5>
+            <p class="text-600 mb-4">{{ loadError }}</p>
+            <div class="flex gap-2">
+                <Button label="Voltar" outlined icon="pi pi-angle-left" @click="goBack" />
+                <Button label="Tentar novamente" icon="pi pi-refresh" @click="loadForm" />
+            </div>
+        </div>
+
+        <form v-else class="p-fluid" @submit.prevent="onSubmit">
+            <div class="card mb-3">
+                <h5 class="mt-0 mb-1">Informação geral</h5>
+                <p class="text-600 mt-0 mb-4">Nome, classificação e descrição do evento.</p>
+
+                <div class="field">
+                    <label for="name">Nome <span class="required">*</span></label>
+                    <InputText id="name" v-model="name" :class="{ 'p-invalid': errors.name }" placeholder="Nome do evento" />
+                    <small class="p-error">{{ errors.name }}</small>
+                </div>
+
+                <div class="formgrid grid">
+                    <div class="field col-12 md:col-4">
+                        <label for="main_category_id">Categoria principal <span class="required">*</span></label>
+                        <Dropdown
+                            id="main_category_id"
+                            v-model="main_category_id"
+                            :options="categories"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="Selecionar"
+                            filter
+                            :class="{ 'p-invalid': errors.main_category_id }"
+                        />
+                        <small class="p-error">{{ errors.main_category_id }}</small>
+                    </div>
+                    <div class="field col-12 md:col-4">
+                        <label for="second_category_id">Categoria secundária</label>
+                        <Dropdown
+                            id="second_category_id"
+                            v-model="second_category_id"
+                            :options="categories"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="Opcional"
+                            showClear
+                            filter
+                            :class="{ 'p-invalid': errors.second_category_id }"
+                        />
+                        <small class="p-error">{{ errors.second_category_id }}</small>
+                    </div>
+                    <div class="field col-12 md:col-4">
+                        <label for="type_event_id">Tipo de evento <span class="required">*</span></label>
+                        <Dropdown
+                            id="type_event_id"
+                            v-model="type_event_id"
+                            :options="typeevent"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="Selecionar"
+                            :class="{ 'p-invalid': errors.type_event_id }"
+                        />
+                        <small class="p-error">{{ errors.type_event_id }}</small>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="description">Descrição <span class="required">*</span></label>
+                    <Textarea
+                        id="description"
+                        v-model="description"
+                        rows="5"
+                        autoResize
+                        :class="{ 'p-invalid': errors.description }"
+                        placeholder="Descreve o evento para o público"
+                    />
+                    <small class="p-error">{{ errors.description }}</small>
+                </div>
             </div>
 
-            <small class="p-error">Os campos marcados * sao considerados campos obrigatorios.</small>
-            <form @submit="onSubmit">
-                <div class="col-12 md:col-12">
-                    <div class="card p-fluid">
-                        <h5>Formulário Criação de Eventos</h5>
-                        <h5>Informação Geral</h5>
-                        <div class="field">
-                            <label for="name">Nome</label>
-                            <InputText v-model="name" id="name" type="text" :class="{ 'p-invalid': errors.name }" />
-                            <small id="name-help" class="p-error">{{ errors.name }}</small>
-                        </div>
-                        <div class="formgrid grid">
-                            <div class="field col">
-                                <label for="province_id">Provincia</label>
-                                <Dropdown v-model="province_id" :options="provinces" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.province_id }" />
-                                <small id="province_id-help" class="p-error">{{ errors.province_id }}</small>
-                            </div>
-                            <div class="field col">
-                                <label for="city_id">Cidade</label>
-                                <Dropdown v-model="city_id" :options="cities" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.city_id }" />
-                                <small id="city_id-help" class="p-error">{{ errors.city_id }}</small>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label for="description">Descrição do Evento</label>
-                            <Textarea rows="5" v-model="description" id="description" type="text" :class="{ 'p-invalid': errors.description }" />
-                            <small id="description-help" class="p-error">{{ errors.description }}</small>
-                        </div>
-                        <div class="formgrid grid">
-                            <div class="field col">
-                                <label for="main_category_id">Categoria Principal</label>
-                                <Dropdown v-model="main_category_id" :options="categories" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.main_category_id }" />
-                                <small id="main_category_id-help" class="p-error">{{ errors.main_category_id }}</small>
-                            </div>
-                            <div class="field col">
-                                <label for="second_category_id">Categoria Secundário</label>
-                                <Dropdown v-model="second_category_id" :options="categories" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.second_category_id }" />
-                                <small id="second_category_id-help" class="p-error">{{ errors.second_category_id }}</small>
-                            </div>
-                            <div class="field col">
-                                <label for="type_event_id">Tipo de Eventos</label>
-                                <Dropdown v-model="type_event_id" :options="typeevent" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.type_event_id }" />
-                                <small id="type_event_id-help" class="p-error">{{ errors.type_event_id }}</small>
-                            </div>
-                        </div>
-                        <h5>Localização e Data do Evento</h5>
-                        <div class="field">
-                            <label for="address">Endereço</label>
-                            <InputText v-model="address" id="address" type="text" :class="{ 'p-invalid': errors.address }" />
-                            <small id="address-help" class="p-error">{{ errors.address }}</small>
-                        </div>
-                        <div class="formgrid grid">
-                            <div class="field col">
-                                <label for="start_date">Data de Inicio</label>
-                                <InputText v-model="start_date" id="start_date" type="date" :class="{ 'p-invalid': errors.start_date }" />
-                                <small id="start_date-help" class="p-error">{{ errors.start_date }}</small>
-                            </div>
-                            <div class="field col">
-                                <label for="start_time">Horas de Inicio</label>
-                                <InputText v-model="start_time" id="start_time" type="time" :class="{ 'p-invalid': errors.start_time }" />
-                                <small id="start_time-help" class="p-error">{{ errors.start_time }}</small>
-                            </div>
-                        </div>
-                        <div class="formgrid grid">
-                            <div class="field col">
-                                <label for="end_date">Data de Termino</label>
-                                <InputText v-model="end_date" id="end_date" type="date" :class="{ 'p-invalid': errors.end_date }" />
-                                <small id="end_date-help" class="p-error">{{ errors.end_date }}</small>
-                            </div>
-                            <div class="field col">
-                                <label for="end_time">Horas de Termino</label>
-                                <InputText v-model="end_time" id="end_time" type="time" :class="{ 'p-invalid': errors.end_time }" />
-                                <small id="end_time-help" class="p-error">{{ errors.end_time }}</small>
-                            </div>
-                        </div>
-                        <h5>Contactos para Informações</h5>
-                        <div class="field">
-                            <label for="email">Email</label>
-                            <InputText v-model="email" id="email" type="text" :class="{ 'p-invalid': errors.email }" />
-                            <small id="email-help" class="p-error">{{ errors.email }}</small>
-                        </div>
-                        <div class="field">
-                            <label for="phone">Telefone</label>
-                            <InputText v-model="phone" id="phone" type="text" :class="{ 'p-invalid': errors.phone }" />
-                            <small id="phone-help" class="p-error">{{ errors.phone }}</small>
-                        </div>
+            <div class="card mb-3">
+                <h5 class="mt-0 mb-1">Localização e datas</h5>
+                <p class="text-600 mt-0 mb-4">Onde e quando o evento acontece.</p>
 
-                        <div class="field">
-                            <label for="website">Website</label>
-                            <InputText v-model="website" id="website" type="text" :class="{ 'p-invalid': errors.website }" />
-                            <small id="website-help" class="p-error">{{ errors.website }}</small>
-                        </div>
-                        <h5>Redes Sociais</h5>
-                        <div class="field">
-                            <label for="instagram">Instagram</label>
-                            <InputText v-model="instagram" id="instagram" type="text" :class="{ 'p-invalid': errors.instagram }" />
-                            <small id="instagram-help" class="p-error">{{ errors.instagram }}</small>
-                        </div>
-                        <div class="field">
-                            <label for="facebook">Facebook</label>
-                            <InputText v-model="facebook" id="facebook" type="text" :class="{ 'p-invalid': errors.facebook }" />
-                            <small id="facebook-help" class="p-error">{{ errors.facebook }}</small>
-                        </div>
-                        <div class="field">
-                            <label for="twitter">Twitter</label>
-                            <InputText v-model="twitter" id="twitter" type="text" :class="{ 'p-invalid': errors.twitter }" />
-                            <small id="twitter-help" class="p-error">{{ errors.twitter }}</small>
-                        </div>
-                        <div class="field">
-                            <label for="youtube">Video Youtube Promocional</label>
-                            <InputText v-model="youtube" id="youtube" type="text" :class="{ 'p-invalid': errors.youtube }" />
-                            <small id="youtube-help" class="p-error">{{ errors.youtube }}</small>
-                        </div>
-                        <h5>Imagem Capa</h5>
-                        <div class="field">
-                            <label for="image">Imagem</label>
-                            <FileUpload mode="basic" name="image[]" accept="image/*" auto :maxFileSize="1000000" customUpload @uploader="onFileUpload" />
-                        </div>
-
-
-                        <!-- <div class="formgrid grid">
-                            <div class="field col">
-                            <label for="license">Carta de Condução</label>
-                            <InputText v-model="license" id="license" type="text" :class="{ 'p-invalid': errors.license }" />
-                            <small id="license-help" class="p-error">{{ errors.license }}</small>
-                            </div>
-                            <div class="field col">
-                                <label for="mobile">Telefone</label>
-                                <InputText v-model="mobile" id="mobile" type="text" :class="{ 'p-invalid': errors.mobile }" />
-                                <small id="mobile-help" class="p-error">{{ errors.mobile }}</small>
-                            </div>
-                        </div>
-
-                        
-                       
-                        <div class="field">
-                            <label for="province_id">Provincia</label>
-                            <Dropdown v-model="province_id" :options="provinces" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.province_id }" />
-                            <small id="province_id-help" class="p-error">{{ errors.province_id }}</small>
-                        </div> -->
+                <div class="formgrid grid">
+                    <div class="field col-12 md:col-6">
+                        <label for="province_id">Província <span class="required">*</span></label>
+                        <Dropdown
+                            id="province_id"
+                            v-model="province_id"
+                            :options="provinces"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="Selecionar"
+                            filter
+                            :class="{ 'p-invalid': errors.province_id }"
+                        />
+                        <small class="p-error">{{ errors.province_id }}</small>
                     </div>
-                    <Button label="Submeter" class="mr-2 mb-2" @click="onSubmit" :disabled="isLoadingButton"></Button
-                    ><ProgressSpinner style="width: 35px; height: 35px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" v-if="isLoadingButton" />
+                    <div class="field col-12 md:col-6">
+                        <label for="city_id">Cidade <span class="required">*</span></label>
+                        <Dropdown
+                            id="city_id"
+                            v-model="city_id"
+                            :options="cities"
+                            optionLabel="name"
+                            optionValue="id"
+                            placeholder="Selecionar"
+                            filter
+                            :class="{ 'p-invalid': errors.city_id }"
+                        />
+                        <small class="p-error">{{ errors.city_id }}</small>
+                    </div>
                 </div>
-            </form>
-        </div>
-    </div>
-    <div class="text-center" v-else>
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
-        <p>Por Favor Aguarde...</p>
+
+                <div class="field">
+                    <label for="address">Endereço <span class="required">*</span></label>
+                    <InputText id="address" v-model="address" :class="{ 'p-invalid': errors.address }" placeholder="Morada ou local do evento" />
+                    <small class="p-error">{{ errors.address }}</small>
+                </div>
+
+                <div class="formgrid grid">
+                    <div class="field col-12 md:col-6">
+                        <label for="start_date">Data de início <span class="required">*</span></label>
+                        <InputText id="start_date" v-model="start_date" type="date" :class="{ 'p-invalid': errors.start_date }" />
+                        <small class="p-error">{{ errors.start_date }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="start_time">Hora de início <span class="required">*</span></label>
+                        <InputText id="start_time" v-model="start_time" type="time" :class="{ 'p-invalid': errors.start_time }" />
+                        <small class="p-error">{{ errors.start_time }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="end_date">Data de fim <span class="required">*</span></label>
+                        <InputText id="end_date" v-model="end_date" type="date" :class="{ 'p-invalid': errors.end_date }" />
+                        <small class="p-error">{{ errors.end_date }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="end_time">Hora de fim <span class="required">*</span></label>
+                        <InputText id="end_time" v-model="end_time" type="time" :class="{ 'p-invalid': errors.end_time }" />
+                        <small class="p-error">{{ errors.end_time }}</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <h5 class="mt-0 mb-1">Contactos</h5>
+                <p class="text-600 mt-0 mb-4">Informação para o público contactar a organização.</p>
+
+                <div class="formgrid grid">
+                    <div class="field col-12 md:col-6">
+                        <label for="email">Email <span class="required">*</span></label>
+                        <InputText id="email" v-model="email" type="email" :class="{ 'p-invalid': errors.email }" />
+                        <small class="p-error">{{ errors.email }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="phone">Telefone <span class="required">*</span></label>
+                        <InputText id="phone" v-model="phone" :class="{ 'p-invalid': errors.phone }" />
+                        <small class="p-error">{{ errors.phone }}</small>
+                    </div>
+                    <div class="field col-12">
+                        <label for="website">Website</label>
+                        <InputText id="website" v-model="website" :class="{ 'p-invalid': errors.website }" placeholder="https://" />
+                        <small class="p-error">{{ errors.website }}</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <h5 class="mt-0 mb-1">Redes sociais</h5>
+                <p class="text-600 mt-0 mb-4">Campos opcionais.</p>
+
+                <div class="formgrid grid">
+                    <div class="field col-12 md:col-6">
+                        <label for="instagram">Instagram</label>
+                        <InputText id="instagram" v-model="instagram" :class="{ 'p-invalid': errors.instagram }" />
+                        <small class="p-error">{{ errors.instagram }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="facebook">Facebook</label>
+                        <InputText id="facebook" v-model="facebook" :class="{ 'p-invalid': errors.facebook }" />
+                        <small class="p-error">{{ errors.facebook }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="twitter">Twitter / X</label>
+                        <InputText id="twitter" v-model="twitter" :class="{ 'p-invalid': errors.twitter }" />
+                        <small class="p-error">{{ errors.twitter }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="youtube">Vídeo YouTube</label>
+                        <InputText id="youtube" v-model="youtube" :class="{ 'p-invalid': errors.youtube }" placeholder="URL do vídeo" />
+                        <small class="p-error">{{ errors.youtube }}</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <h5 class="mt-0 mb-1">Imagem de capa</h5>
+                <p class="text-600 mt-0 mb-4">Recomendado: imagem horizontal, até 1 MB.</p>
+
+                <div class="image-row">
+                    <div v-if="hasImage" class="image-preview-wrap">
+                        <img :src="imagePreview" alt="Pré-visualização" class="image-preview" />
+                        <Button type="button" icon="pi pi-times" rounded text severity="danger" class="image-clear" @click="clearImage" />
+                    </div>
+                    <FileUpload
+                        mode="basic"
+                        name="image"
+                        accept="image/*"
+                        :maxFileSize="1000000"
+                        chooseLabel="Escolher imagem"
+                        customUpload
+                        auto
+                        @uploader="onFileUpload"
+                    />
+                </div>
+            </div>
+
+            <div class="flex flex-wrap justify-content-end gap-2">
+                <Button type="button" label="Cancelar" outlined :disabled="isSubmitting" @click="goBack" />
+                <Button type="submit" label="Criar evento" icon="pi pi-check" :loading="isSubmitting" />
+            </div>
+        </form>
     </div>
 </template>
+
+<style scoped>
+.required {
+    color: #dc2626;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.image-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+}
+
+.image-preview-wrap {
+    position: relative;
+}
+
+.image-preview {
+    width: 16rem;
+    height: 10rem;
+    object-fit: cover;
+    border-radius: 0.85rem;
+    border: 1px solid var(--surface-border);
+}
+
+.image-clear {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+}
+</style>

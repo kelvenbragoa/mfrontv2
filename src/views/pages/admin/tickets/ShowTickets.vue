@@ -1,212 +1,294 @@
 <script setup>
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { baseURL, storageURL } from '@/service/ApiConstant';
-import { onMounted, ref } from 'vue';
 import axios from 'axios';
-import { useForm } from 'vee-validate';
-import * as yup from 'yup';
 import { useToast } from 'primevue/usetoast';
-import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
 import moment from 'moment';
 import QrcodeVue from 'qrcode.vue';
 
-
 const router = useRouter();
-const isLoadingDiv = ref(true);
-const isLoadingButton = ref(false);
-const retriviedData = ref();
 const toast = useToast();
-const provinces = ref([]);
-const cities = ref([]);
-const typeevent = ref([]);
-const categories = ref([]);
-const tickets = ref([]);
 
-//DIALOG
-const displayCreateTicket = ref(false);
-const openCreateTicket = () => {
-    displayCreateTicket.value = true;
-};
-const closeCreateTicket = () => {
-    displayCreateTicket.value = false;
-};
+const ticketId = router.currentRoute.value.params.id;
 
-function goBackUsingBack() {
-    if (router) {
-        router.back();
+const isLoading = ref(true);
+const loadError = ref(null);
+const data = ref(null);
+
+const getData = async () => {
+    isLoading.value = true;
+
+    try {
+        const response = await axios.get(`${baseURL}/admin-tickets/${ticketId}`);
+
+        if (!response.data.ticket) {
+            loadError.value = 'Bilhete não encontrado.';
+            return;
+        }
+
+        data.value = response.data.ticket;
+        loadError.value = null;
+    } catch (error) {
+        const status = error?.response?.status;
+
+        if (status === 404) {
+            loadError.value = 'Bilhete não encontrado.';
+        } else if (status === 403) {
+            loadError.value = 'Não tens permissão para ver este bilhete.';
+        } else {
+            loadError.value = 'Não foi possível carregar o bilhete. Tenta novamente.';
+        }
+    } finally {
+        isLoading.value = false;
     }
-}
-const schema = yup.object({
-    name: yup.string().required().label('Name'),
-    address: yup.string().required().label('Address'),
-    city: yup.string().required().label('City'),
-    province_id: yup.string().required().label('Province')
-});
-
-const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
-    validationSchema: schema
-});
-
-const [name] = defineField('name');
-const [address] = defineField('address');
-const [city] = defineField('city');
-const [province_id] = defineField('province_id');
-
-const onSubmitCreateTicket = handleSubmit((values) => {
-    console.log('Submitted with', values);
-    isLoadingButton.value = true;
-    axios
-        .post(`${baseURL}/drivers`, values)
-        .then((response) => {
-            resetForm();
-            router.push({ path: '/drivers' });
-            toast.add({ severity: 'success', summary: `Successo`, detail: 'Registro criada com sucesso', life: 3000 });
-        })
-        .catch((error) => {
-            isLoadingButton.value = false;
-            toast.add({ severity: 'error', summary: `${error.response.data.message}`, detail: 'Detalhe da Mensagem', life: 3000 });
-            if (error.response.data.errors) {
-                setErrors(error.response.data.errors);
-            }
-        })
-        .finally(() => {
-            isLoadingButton.value = false;
-        });
-});
-
-const getData = () => {
-    axios
-        .get(`${baseURL}/admin-tickets/${router.currentRoute.value.params.id}`)
-        .then((response) => {
-            retriviedData.value = response.data.ticket;
-
-            isLoadingDiv.value = false;
-        })
-        .catch((error) => {
-            isLoadingDiv.value = false;
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            goBackUsingBack();
-        });
 };
+
+const goBack = () => router.back();
+
+const formatCurrency = (value) =>
+    `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)} MT`;
+
+const formatDate = (value) => (value ? moment(value).format('DD/MM/YYYY') : '--');
+
+const formatDateTime = (value) => (value ? moment(value).format('DD/MM/YYYY HH:mm') : '--');
+
+const formatTime = (value) => (value ? moment(value, 'HH:mm:ss').format('HH:mm') : '--');
+
+const event = computed(() => data.value?.event ?? null);
+
+const isValid = computed(() => Number(data.value?.status) === 1);
+
+const statusTag = computed(() =>
+    isValid.value ? { label: 'Por usar', severity: 'success' } : { label: 'Validado à entrada', severity: 'secondary' }
+);
+
+const qrValue = computed(() => {
+    if (!data.value) return '';
+    return JSON.stringify({ s: data.value.status, i: data.value.id, ie: data.value.event_id });
+});
+
+const eventImage = computed(() => (event.value?.image ? `${storageURL}${event.value.image}` : '/demo/images/mticket.jpg'));
+
+const copyReference = async () => {
+    const reference = data.value?.sell?.transaction?.reference;
+    if (!reference) return;
+
+    try {
+        await navigator.clipboard.writeText(reference);
+        toast.add({ severity: 'success', summary: 'Copiado', detail: 'Referência copiada.', life: 2000 });
+    } catch (error) {
+        toast.add({ severity: 'warn', summary: 'Não foi possível copiar', detail: reference, life: 4000 });
+    }
+};
+
 onMounted(() => {
     getData();
 });
 </script>
+
 <template>
-    <div className="card" v-if="!isLoadingDiv">
-        <div class="col-12">
-            <div class="card-w-title">
-                <Button label="Voltar" class="mr-2 mb-2" @click="goBackUsingBack"><i class="pi pi-angle-left"></i> Voltar</Button>
-                <!-- <h5>Evento</h5> -->
-            </div>
+    <div class="admin-ticket-show">
+        <div v-if="isLoading" class="card">
+            <Skeleton width="10rem" height="1.5rem" class="mb-4" />
+            <Skeleton height="8rem" class="mb-3" />
+            <Skeleton height="16rem" />
+        </div>
 
-            <p>Ticket</p>
-
-            <p><strong>ID: </strong>#{{ retriviedData.id }}</p>
-            <p><strong>Evento: </strong>{{ retriviedData.event.name }}</p>
-            <p><strong>Bilhete: </strong>{{ retriviedData.ticket.name }}</p>
-            <p><strong>Transação: </strong>{{ retriviedData.sell.transaction.reference }}</p>
-            <p><strong>Nome: </strong>{{ retriviedData.name }}</p>
-            <p><strong>Email: </strong>{{ retriviedData.email }}</p>
-            <p><strong>Telefone: </strong>{{ retriviedData.mobile }}</p>
-            <hr />
-
-            <div class="ticket">
-                <div class="left">
-                    <div class="image" :style="`background-image: url(${storageURL}${retriviedData.event.image})`">
-                        <p class="admit-one">
-                            <span>Mticket</span>
-                            <span>Mticket</span>
-                            <span>Mticket</span>
-                        </p>
-                        <div class="ticket-number">
-                            <p>#0{{ retriviedData.id }}</p>
-                        </div>
-                    </div>
-                    <div class="ticket-info">
-                        <p class="date">
-                            <span>{{ moment(retriviedData.event.start_date).format('dddd') }}</span>
-                            <span class="june-29">{{ moment(retriviedData.event.start_date).format('D') }} - {{ moment(retriviedData.event.start_date).format('MM') }}</span>
-                            <span>{{ moment(retriviedData.event.start_date).format('YYYY') }}</span>
-                        </p>
-                        <div class="show-name">
-                            <h1>{{ retriviedData.event.name }}</h1>
-                            <br />
-                            <h2>{{ retriviedData.name }}</h2>
-                            <h2>{{ retriviedData.ticket.name }}</h2>
-                            <div class="cardticket">
-                                <p>{{ retriviedData.ticket.description }}</p>
-                            </div>
-                        </div>
-                        <div class="time">
-                            <p>{{ moment(retriviedData.event.start_time, 'HH:mm:ss').format('HH:mm') }}</p>
-                        </div>
-                        <p class="location">
-                            <span>{{ retriviedData.event.address }}</span> <span class="separator"> </span><span>{{ retriviedData.event.province.name }}, Moçambique</span>
-                        </p>
-                    </div>
-                </div>
-                <div class="right">
-                    <p class="admit-one">
-                        <span>Mticket</span>
-                        <span>Mticket</span>
-                        <span>Mticket</span>
-                    </p>
-                    <div class="right-info-container">
-                        <div class="show-name">
-                            <h1>{{ retriviedData.event.name }}</h1>
-                        </div>
-                        <div class="time">
-                            <p>{{ moment(retriviedData.event.start_time, 'HH:mm:ss').format('HH:mm') }} até {{ moment(retriviedData.event.end_time, 'HH:mm:ss').format('HH:mm') }}</p>
-                        </div>
-                        <div class="barcode">
-                            <qrcode-vue :value="`{&quot;s&quot;:${retriviedData.status},&quot;i&quot;:${retriviedData.id},&quot;ie&quot;:${retriviedData.event_id}}`" :size="100" level="H" render-as="svg" />
-                        </div>
-                        <p class="ticket-number">#0{{ retriviedData.id }}</p>
-                    </div>
-                </div>
+        <div v-else-if="loadError" class="card empty-state">
+            <i class="pi pi-exclamation-triangle text-4xl text-orange-500 mb-3" />
+            <h5 class="text-900 mb-2">Não foi possível abrir o bilhete</h5>
+            <p class="text-600 mb-4">{{ loadError }}</p>
+            <div class="flex gap-2">
+                <Button label="Voltar" icon="pi pi-angle-left" outlined @click="goBack" />
+                <Button label="Tentar novamente" icon="pi pi-refresh" @click="getData()" />
             </div>
         </div>
-    </div>
-    <div class="text-center" v-else>
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
-        <p>Por Favor Aguarde...</p>
+
+        <template v-else>
+            <div class="card">
+                <div class="flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+                    <Button label="Voltar" icon="pi pi-angle-left" text @click="goBack" />
+                    <Tag :severity="statusTag.severity" :value="statusTag.label" />
+                </div>
+
+                <h4 class="mt-0 mb-1 text-900">Bilhete #{{ data.id }}</h4>
+                <p class="text-600 mt-0 mb-4">
+                    Emitido a {{ formatDateTime(data.created_at) }}
+                </p>
+
+                <div class="detail-grid">
+                    <div>
+                        <span class="detail-label">Evento</span>
+                        <router-link v-if="event" :to="`/admin/eventos/${event.id}`" class="detail-value text-primary no-underline">
+                            {{ event.name }}
+                        </router-link>
+                        <span v-else class="detail-value">Evento indisponível</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Tipo de bilhete</span>
+                        <span class="detail-value">{{ data.ticket?.name || '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Valor</span>
+                        <span class="detail-value">{{ formatCurrency(data.ticket?.price ?? data.sell?.price) }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Data do evento</span>
+                        <span class="detail-value">{{ event ? formatDate(event.start_date) : '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Comprador</span>
+                        <span class="detail-value">{{ data.name || '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value">{{ data.email || '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Telefone</span>
+                        <span class="detail-value">{{ data.mobile || '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Referência da transação</span>
+                        <span class="detail-value flex align-items-center gap-2">
+                            {{ data.sell?.transaction?.reference || '--' }}
+                            <Button
+                                v-if="data.sell?.transaction?.reference"
+                                icon="pi pi-copy"
+                                text
+                                rounded
+                                size="small"
+                                severity="secondary"
+                                v-tooltip.top="'Copiar referência'"
+                                @click="copyReference"
+                            />
+                        </span>
+                    </div>
+                </div>
+
+                <Message v-if="!isValid" severity="info" :closable="false" class="mt-4">
+                    Este bilhete já foi validado à entrada e não pode ser reutilizado.
+                </Message>
+            </div>
+
+            <div class="card">
+                <h5 class="mt-0 mb-4">Bilhete</h5>
+
+                <div class="ticket-wrapper">
+                    <div class="ticket">
+                        <div class="left">
+                            <div class="image" :style="{ backgroundImage: `url(${eventImage})` }">
+                                <p class="admit-one">
+                                    <span>Mticket</span>
+                                    <span>Mticket</span>
+                                    <span>Mticket</span>
+                                </p>
+                                <div class="ticket-number">
+                                    <p>#0{{ data.id }}</p>
+                                </div>
+                            </div>
+                            <div class="ticket-info">
+                                <p class="date">
+                                    <span>{{ event ? moment(event.start_date).format('dddd') : '--' }}</span>
+                                    <span class="day-month">
+                                        {{ event ? moment(event.start_date).format('D') : '--' }} -
+                                        {{ event ? moment(event.start_date).format('MM') : '--' }}
+                                    </span>
+                                    <span>{{ event ? moment(event.start_date).format('YYYY') : '--' }}</span>
+                                </p>
+                                <div class="show-name">
+                                    <h1>{{ event?.name || 'Evento' }}</h1>
+                                    <br />
+                                    <h2>{{ data.name }}</h2>
+                                    <h2>{{ data.ticket?.name }}</h2>
+                                    <div class="cardticket">
+                                        <p>{{ data.ticket?.description }}</p>
+                                    </div>
+                                </div>
+                                <div class="time">
+                                    <p>{{ formatTime(event?.start_time) }}</p>
+                                </div>
+                                <p class="location">
+                                    <span>{{ event?.address || '--' }}</span>
+                                    <span class="separator"> </span>
+                                    <span>{{ event?.province?.name ? `${event.province.name}, Moçambique` : 'Moçambique' }}</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="right">
+                            <p class="admit-one">
+                                <span>Mticket</span>
+                                <span>Mticket</span>
+                                <span>Mticket</span>
+                            </p>
+                            <div class="right-info-container">
+                                <div class="show-name">
+                                    <h1>{{ event?.name || 'Evento' }}</h1>
+                                </div>
+                                <div class="time">
+                                    <p>{{ formatTime(event?.start_time) }} até {{ formatTime(event?.end_time) }}</p>
+                                </div>
+                                <div class="barcode">
+                                    <qrcode-vue :value="qrValue" :size="100" level="H" render-as="svg" />
+                                </div>
+                                <p class="ticket-number">#0{{ data.id }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
     </div>
 </template>
 
 <style scoped>
 @import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Staatliches&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap');
 
-body,
-html {
-    height: 100vh;
+.detail-grid {
     display: grid;
-    font-family: 'Staatliches', cursive;
-    background: #ffff;
-    color: black;
-    font-size: 14px;
-    letter-spacing: 0.1em;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1.25rem;
 }
 
-.ticketgeneral {
-    height: 100vh;
-    display: grid;
-    font-family: 'Staatliches', cursive;
-    background: #ffff;
-    color: black;
-    font-size: 14px;
-    letter-spacing: 0.1em;
+.detail-label {
+    display: block;
+    color: #64748b;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.detail-value {
+    color: var(--text-color);
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.ticket-wrapper {
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
 }
 
 .ticket {
     margin: auto;
     display: flex;
+    width: max-content;
     background: white;
+    color: black;
+    font-family: 'Staatliches', cursive;
+    font-size: 14px;
+    letter-spacing: 0.1em;
     box-shadow: rgba(0, 0, 0, 0.3) 0px 19px 38px, rgba(0, 0, 0, 0.22) 0px 15px 12px;
-    margin-bottom: 5px;
 }
 
 .left {
@@ -216,8 +298,8 @@ html {
 .image {
     height: 250px;
     width: 250px;
-    /* background-image: url('/storage/{{$event->image}}'); */
-    background-size: contain;
+    background-size: cover;
+    background-position: center;
     opacity: 0.85;
 }
 
@@ -279,7 +361,7 @@ html {
     text-align: right;
 }
 
-.date .june-29 {
+.date .day-month {
     color: #d83565;
     font-size: 20px;
 }
@@ -294,24 +376,17 @@ html {
     font-size: 38px;
     font-weight: 700;
     letter-spacing: 0.1em;
-    /* color: #04aff4; */
     color: black;
 }
 
 .time {
     padding: 10px 0;
-    /* color: #04aff4; */
     color: black;
     text-align: center;
     display: flex;
     flex-direction: column;
     gap: 10px;
     font-weight: 700;
-}
-
-.time span {
-    font-weight: 400;
-    color: gray;
 }
 
 .left .time {
@@ -361,16 +436,11 @@ html {
     height: 100px;
 }
 
-.barcode img {
-    height: 100%;
-}
-
 .right .ticket-number {
     color: gray;
 }
 
 .cardticket {
-    align-items: center;
     padding: 10px 30px;
     display: flex;
     flex-direction: column;
@@ -382,5 +452,17 @@ html {
 
 .cardticket p {
     color: black;
+}
+
+@media (max-width: 991px) {
+    .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 575px) {
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>

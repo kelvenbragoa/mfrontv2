@@ -1,176 +1,603 @@
 <script setup>
-import { useLayout } from '@/layout/composables/layout';
-import { computed } from 'vue';
-import AppConfig from '@/layout/AppConfig.vue';
-import { ProductService } from '@/service/ProductService';
-import { PhotoService } from '@/service/PhotoService';
-import { ref, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import axios from 'axios';
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
 import { baseURL, storageURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 
-const router = useRouter();
-const isLoadingDiv = ref(true);
-const isLoadingButton = ref(false);
-const loadingButtonDelete = ref(false);
-const retriviedData = ref();
-const event_recomended = ref();
+const route = useRoute();
 const toast = useToast();
 
-const products = ref([]);
-const images = ref([]);
+const isLoadingDiv = ref(true);
+const notFound = ref(false);
+const event = ref(null);
+const recommended = ref([]);
+const brokenImages = ref(new Set());
 
-const { layoutConfig } = useLayout();
+const isOnSale = computed(() => {
+    if (!event.value?.end_date) return false;
+    return moment().isSameOrBefore(moment(event.value.end_date));
+});
 
-const smoothScroll = (id) => {
-    document.querySelector(id).scrollIntoView({
-        behavior: 'smooth'
-    });
-};
-const carouselResponsiveOptions = ref([
-    {
-        breakpoint: '1024px',
-        numVisible: 3,
-        numScroll: 3
-    },
-    {
-        breakpoint: '768px',
-        numVisible: 2,
-        numScroll: 2
-    },
-    {
-        breakpoint: '560px',
-        numVisible: 1,
-        numScroll: 1
+const statusLabel = computed(() => (isOnSale.value ? 'À venda' : 'Encerrado'));
+const statusSeverity = computed(() => (isOnSale.value ? 'success' : 'danger'));
+
+const minPrice = computed(() => {
+    const tickets = event.value?.tickets || [];
+    if (!tickets.length) return null;
+    return Math.min(...tickets.map((t) => Number(t.price) || 0));
+});
+
+const formattedMinPrice = computed(() => {
+    if (minPrice.value === null) return 'Ver bilhetes';
+    if (minPrice.value <= 0) return 'Grátis';
+    return `A partir de ${Number(minPrice.value).toLocaleString('pt-MZ')} MT`;
+});
+
+const locationLabel = computed(() => {
+    if (!event.value) return '';
+    const city = event.value.city?.name;
+    const province = event.value.province?.name;
+    if (city && province) return `${city}, ${province}`;
+    return event.value.address || province || 'Local a anunciar';
+});
+
+const promoterName = computed(() => {
+    return event.value?.user?.company_name || event.value?.user?.name || 'Promotor';
+});
+
+const likesCount = computed(() => event.value?.like?.length || 0);
+const ticketsCount = computed(() => event.value?.tickets?.length || 0);
+const hasLineups = computed(() => (event.value?.lineups || []).length > 0);
+const hasRecommended = computed(() => recommended.value.length > 0);
+
+const heroBackground = computed(() => {
+    if (!event.value?.image || brokenImages.value.has(`event-${event.value.id}`)) {
+        return null;
     }
-]);
+    return storageURL + event.value.image;
+});
+
+const markBrokenImage = (key) => {
+    brokenImages.value = new Set([...brokenImages.value, key]);
+};
+
+const imageSrc = (item, type = 'event') => {
+    const key = `${type}-${item?.id}`;
+    if (!item?.image || brokenImages.value.has(key)) {
+        return '/demo/images/product/product-placeholder.svg';
+    }
+    return storageURL + item.image;
+};
+
+const formatPrice = (item) => {
+    const price = item.tickets_min_price ?? item.price;
+    if (price === null || price === undefined || Number(price) <= 0) {
+        return 'Grátis / Ver bilhetes';
+    }
+    return `A partir de ${Number(price).toLocaleString('pt-MZ')} MT`;
+};
+
+const eventLocation = (item) => {
+    const city = item.city?.name;
+    const province = item.province?.name;
+    if (city && province) return `${city}, ${province}`;
+    return item.address || province || 'Local a anunciar';
+};
 
 const getValue = (eventdate) => {
-    var now = moment();
-    var date = moment(eventdate);
-    if (now > date) {
-        return 'Encerrado';
-    } else {
-        return 'A Venda';
-    }
+    return moment().isSameOrBefore(moment(eventdate)) ? 'À venda' : 'Encerrado';
 };
 
 const getSeverity = (eventdate) => {
-    var now = moment();
-    var date = moment(eventdate);
-    if (now > date) {
-        return 'danger';
-    } else {
-        return 'success';
+    return moment().isSameOrBefore(moment(eventdate)) ? 'success' : 'danger';
+};
+
+const formatTicketPrice = (price) => `${Number(price || 0).toLocaleString('pt-MZ')} MT`;
+
+const getData = async () => {
+    isLoadingDiv.value = true;
+    notFound.value = false;
+    event.value = null;
+    recommended.value = [];
+
+    try {
+        const response = await axios.get(`${baseURL}/eventos/${route.params.id}`);
+        event.value = response.data.events;
+        recommended.value = response.data.recommended || response.data.event_recomended || [];
+    } catch (error) {
+        if (error?.response?.status === 404) {
+            notFound.value = true;
+        } else {
+            toast.add({
+                severity: 'error',
+                summary: 'Não foi possível carregar o evento',
+                detail: 'Tenta novamente dentro de momentos.',
+                life: 4000
+            });
+        }
+    } finally {
+        isLoadingDiv.value = false;
     }
 };
-const getData = () => {
-    axios
-        .get(`${baseURL}/eventos/${router.currentRoute.value.params.id}`)
-        .then((response) => {
-            // toast.add({ severity: 'success', summary: 'Success Message', detail: 'Message Detail', life: 3000 });
-            retriviedData.value = response.data.events;
-            event_recomended.value = response.data.event_recomended;
-            isLoadingDiv.value = false;
-        })
-        .catch((error) => {
-            isLoadingDiv.value = false;
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            goBackUsingBack();
-        });
-};
-onMounted(() => {
-    getData();
-});
+
+onMounted(getData);
+watch(() => route.params.id, getData);
 </script>
 
 <template>
-    <div id="features" class="py-4 px-4 lg:px-8 mt-5 mx-0 lg:mx-8" v-if="!isLoadingDiv">
-        <div class="grid justify-content-left">
-            <div class="col-12 text-left mt-8 mb-4">
-                <h2 class="text-900 font-normal mb-2">{{ retriviedData.name }}</h2>
-                <span class="text-600 text-2xl">{{ moment(retriviedData.start_date).format('LL') }}, {{ retriviedData.address }}, {{ retriviedData.province.name }}</span>
+    <div v-if="isLoadingDiv" class="event-show px-4 lg:px-8 mx-0 lg:mx-8 py-4">
+        <Skeleton height="20rem" class="mb-4 border-round-xl" />
+        <div class="grid">
+            <div class="col-12 lg:col-8">
+                <Skeleton height="2rem" width="70%" class="mb-3" />
+                <Skeleton height="12rem" class="mb-3" />
+                <Skeleton height="8rem" />
             </div>
-
-            <div class="col-12 md:col-12 lg:col-4 p-0 lg:pr-5 lg:pb-5 mt-4 lg:mt-0">
-                <div style="padding: 2px; border-radius: 10px; background: linear-gradient(90deg, rgba(253, 228, 165, 0.2), rgba(187, 199, 205, 0.2)), linear-gradient(180deg, rgba(253, 228, 165, 0.2), rgba(187, 199, 205, 0.2))">
-                    <div class="p-3 surface-card h-full" style="border-radius: 8px">
-                        <!-- <div class="flex align-items-center justify-content-center mb-3" style="width: 3.5rem; height: 3.5rem; border-radius: 10px">
-                                    
-                                </div> -->
-                        <h5 class="mb-2 text-900">Informações</h5>
-                        <p>
-                            <span class="text-600"><i class="pi pi-fw pi-clock text-2xl"></i> {{ moment(retriviedData.start_date).format('LL') }}</span>
-                        </p>
-                        <p>
-                            <span class="text-600"><i class="pi pi-fw pi-tags text-2xl"></i> {{ retriviedData.tickets.length }} Bilhetes disponíveis</span>
-                        </p>
-                        <p>
-                            <span class="text-600"><i class="pi pi-fw pi-map-marker text-2xl"></i> {{ retriviedData.city.name }}, {{ retriviedData.province.name }}</span>
-                        </p>
-                        <p><Tag :value="getValue(retriviedData.end_date)" :severity="getSeverity(retriviedData.end_date)" style="right: 6px; top: 5px" /></p>
-                        <router-link :to="'/checkout/' + retriviedData.slug + '/evento'" v-if="moment() < moment(retriviedData.end_date)"
-                            ><Button label="Comprar" class="p-button-rounded border-none font-light text-white line-height-2 bg-blue-500"></Button
-                        ></router-link>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 md:col-12 lg:col-8 p-0 lg:pr-5 lg:pb-5 mt-4 lg:mt-0">
-                <div style="padding: 2px; border-radius: 10px; background: linear-gradient(90deg, rgba(253, 228, 165, 0.2), rgba(187, 199, 205, 0.2)), linear-gradient(180deg, rgba(253, 228, 165, 0.2), rgba(187, 199, 205, 0.2))">
-                    <div class="p-3 surface-card h-full" style="border-radius: 8px">
-                        <span class="text-600">{{ retriviedData.city.name }}, {{ retriviedData.province.name }} {{ retriviedData.address }}.</span>
-                        <img :src="storageURL + retriviedData.image" class="w-full border-round hover:scale-110 transition duration-500 cursor-pointer object-cover" />
-                        <h2 class="text-900 font-normal mb-2">{{ retriviedData.name }}</h2>
-                        <p>
-                            <span class="text-600"
-                                ><strong>{{ retriviedData.like.length }}</strong
-                                ><i class="pi pi-fw pi-thumbs-up-fill"></i> | {{ retriviedData.tickets.length }} Bilhetes
-                            </span>
-                        </p>
-                        <p class="mt-4"><strong>Informações</strong></p>
-                        <p>
-                            <span class="text-600"><i class="pi pi-fw pi-map-marker"></i> {{ retriviedData.city.name }}, {{ retriviedData.province.name }}</span>
-                        </p>
-                        <p>
-                            <span class="text-600"><i class="pi pi-fw pi-at"></i>{{ retriviedData.user.email }}</span>
-                        </p>
-                        <p>
-                            <span class="text-600"><i class="pi pi-fw pi-mobile"></i>{{ retriviedData.user.mobile }}</span>
-                        </p>
-                        <hr />
-
-                        <p class="mt-4"><strong>Descrição</strong></p>
-                        <p>
-                            <span class="text-600"> {{ retriviedData.description }} </span>
-                        </p>
-                        <hr />
-                        <p class="mt-4"><strong>LineUps</strong></p>
-                        <Panel :header="retriviedData.lineups.length + ' LineUp'" :toggleable="true" :collapsed="true" class="mb-1">
-                            <p class="line-height-3 m-0" v-for="lineup in retriviedData.lineups" :key="lineup.id">
-                                <strong> {{ lineup.name }} </strong> : {{ lineup.description }} - {{ lineup.start_time }} - {{ lineup.end_time }}
-                            </p>
-                        </Panel>
-                        <hr />
-                        <p class="mt-4"><strong>Dúvidas</strong></p>
-                        <Panel header="Em caso de cancelamento de evento?" :toggleable="true" :collapsed="true" class="mb-1">
-                            <p class="line-height-3 m-0">Em caso de cancelamento do evento o promotor irá informar em relação a proxima data.</p>
-                        </Panel>
-                        <Panel header="Os ingressos não adiquiridos na plataforma mticket?" :toggleable="true" :collapsed="true" class="mb-1">
-                            <p class="line-height-3 m-0">A aquisição dos ingressos para eventos só serão aceites se forem adiquiridos a partir da plataforma.</p>
-                        </Panel>
-                        <Panel header="Como é feito o scan" :toggleable="true" :collapsed="true" class="mb-1">
-                            <p class="line-height-3 m-0">Após a aquisição do ingresso irá receber o mesmo em forma de QrCode, baste que apresente na portaria.</p>
-                        </Panel>
-                    </div>
-                </div>
+            <div class="col-12 lg:col-4">
+                <Skeleton height="18rem" class="border-round-xl" />
             </div>
         </div>
     </div>
-    <div class="text-center" v-else>
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
-        <p>Por Favor Aguarde...</p>
+
+    <div v-else-if="notFound" class="event-show px-4 lg:px-8 mx-0 lg:mx-8 py-6">
+        <div class="empty-block">
+            <h2 class="text-900 mt-0 mb-2">Evento não encontrado</h2>
+            <p class="text-600 mb-3">Este evento pode ter sido removido ou o link está incorreto.</p>
+            <router-link to="/eventos">
+                <Button label="Ver todos os eventos" class="p-button-rounded border-none font-medium text-white bg-blue-500" />
+            </router-link>
+        </div>
+    </div>
+
+    <div v-else-if="event" class="event-show">
+        <section class="event-hero" :style="heroBackground ? { '--hero-image': `url('${heroBackground}')` } : null">
+            <div class="event-hero__veil" />
+            <div class="event-hero__content px-4 lg:px-8 mx-0 lg:mx-8">
+                <router-link to="/eventos" class="event-hero__back">
+                    <i class="pi pi-arrow-left mr-2" />
+                    Eventos
+                </router-link>
+                <div class="flex align-items-center gap-2 mb-3 flex-wrap">
+                    <Tag v-if="event.type?.name" :value="event.type.name" severity="info" />
+                    <Tag :value="statusLabel" :severity="statusSeverity" />
+                    <Tag v-if="event.category?.name" :value="event.category.name" />
+                </div>
+                <h1 class="event-hero__title">{{ event.name }}</h1>
+                <p class="event-hero__meta">
+                    <span><i class="pi pi-calendar mr-2" />{{ moment(event.start_date).format('LL') }} · {{ event.start_time?.slice(0, 5) }}</span>
+                    <span><i class="pi pi-map-marker mr-2" />{{ locationLabel }}</span>
+                </p>
+            </div>
+        </section>
+
+        <section class="px-4 lg:px-8 mx-0 lg:mx-8 py-4">
+            <div class="grid">
+                <div class="col-12 lg:col-8">
+                    <div class="detail-panel mb-4">
+                        <img
+                            :src="imageSrc(event)"
+                            :alt="event.name"
+                            class="detail-panel__image"
+                            @error="markBrokenImage(`event-${event.id}`)"
+                        />
+                        <div class="detail-panel__stats">
+                            <span><strong>{{ likesCount }}</strong> gostos</span>
+                            <span><strong>{{ ticketsCount }}</strong> tipos de bilhete</span>
+                            <span>{{ promoterName }}</span>
+                        </div>
+                    </div>
+
+                    <div class="detail-panel mb-4">
+                        <h2 class="detail-title">Sobre o evento</h2>
+                        <p class="detail-text">{{ event.description || 'Sem descrição disponível.' }}</p>
+
+                        <Divider />
+
+                        <h3 class="detail-subtitle">Local</h3>
+                        <p class="detail-text mb-2">
+                            <i class="pi pi-map-marker mr-2" />
+                            {{ event.address }} · {{ locationLabel }}
+                        </p>
+
+                        <h3 class="detail-subtitle">Promotor</h3>
+                        <p class="detail-text mb-1">{{ promoterName }}</p>
+                        <p v-if="event.user?.email || event.email" class="detail-text mb-1">
+                            <i class="pi pi-envelope mr-2" />
+                            {{ event.email || event.user?.email }}
+                        </p>
+                        <p v-if="event.phone || event.user?.mobile" class="detail-text mb-0">
+                            <i class="pi pi-mobile mr-2" />
+                            {{ event.phone || event.user?.mobile }}
+                        </p>
+                    </div>
+
+                    <div class="detail-panel mb-4">
+                        <h2 class="detail-title">Bilhetes</h2>
+                        <div v-if="ticketsCount" class="ticket-list">
+                            <div v-for="ticket in event.tickets" :key="ticket.id" class="ticket-row">
+                                <div>
+                                    <div class="ticket-row__name">{{ ticket.name }}</div>
+                                    <div v-if="ticket.description" class="ticket-row__desc">{{ ticket.description }}</div>
+                                </div>
+                                <div class="ticket-row__price">{{ formatTicketPrice(ticket.price) }}</div>
+                            </div>
+                        </div>
+                        <p v-else class="detail-text mb-0">Ainda não há bilhetes publicados para este evento.</p>
+                    </div>
+
+                    <div v-if="hasLineups" class="detail-panel mb-4">
+                        <h2 class="detail-title">Line-up</h2>
+                        <div class="lineup-list">
+                            <div v-for="lineup in event.lineups" :key="lineup.id" class="lineup-row">
+                                <div>
+                                    <div class="ticket-row__name">{{ lineup.name }}</div>
+                                    <div v-if="lineup.description" class="ticket-row__desc">{{ lineup.description }}</div>
+                                </div>
+                                <div class="ticket-row__price">
+                                    {{ lineup.start_time?.slice(0, 5) }}
+                                    <span v-if="lineup.end_time"> – {{ lineup.end_time.slice(0, 5) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-panel mb-4">
+                        <h2 class="detail-title">Dúvidas frequentes</h2>
+                        <Panel header="Em caso de cancelamento do evento?" :toggleable="true" :collapsed="true" class="mb-2">
+                            <p class="line-height-3 m-0">Em caso de cancelamento, o promotor informa sobre a próxima data ou o reembolso.</p>
+                        </Panel>
+                        <Panel header="Os ingressos não adquiridos na Mticket são válidos?" :toggleable="true" :collapsed="true" class="mb-2">
+                            <p class="line-height-3 m-0">Só são aceites ingressos adquiridos através da plataforma Mticket.</p>
+                        </Panel>
+                        <Panel header="Como funciona o scan na entrada?" :toggleable="true" :collapsed="true">
+                            <p class="line-height-3 m-0">Após a compra, recebes um QR Code para apresentar na portaria.</p>
+                        </Panel>
+                    </div>
+                </div>
+
+                <div class="col-12 lg:col-4">
+                    <aside class="buy-card">
+                        <div class="buy-card__price">{{ formattedMinPrice }}</div>
+                        <p class="buy-card__date">
+                            <i class="pi pi-calendar mr-2" />
+                            {{ moment(event.start_date).format('LL') }}
+                            <span v-if="event.start_time"> · {{ event.start_time.slice(0, 5) }}</span>
+                        </p>
+                        <p class="buy-card__location">
+                            <i class="pi pi-map-marker mr-2" />
+                            {{ locationLabel }}
+                        </p>
+                        <p class="buy-card__tickets">
+                            <i class="pi pi-ticket mr-2" />
+                            {{ ticketsCount }} {{ ticketsCount === 1 ? 'tipo de bilhete' : 'tipos de bilhete' }}
+                        </p>
+                        <Tag :value="statusLabel" :severity="statusSeverity" class="mb-3" />
+
+                        <router-link v-if="isOnSale" :to="'/checkout/' + event.slug + '/evento'" class="w-full">
+                            <Button label="Comprar bilhetes" class="w-full p-button-rounded border-none font-medium text-white bg-blue-500" />
+                        </router-link>
+                        <Button v-else label="Vendas encerradas" class="w-full p-button-rounded" disabled />
+
+                        <router-link to="/eventos" class="w-full mt-2 block">
+                            <Button label="Ver mais eventos" class="w-full p-button-rounded p-button-outlined" />
+                        </router-link>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="hasRecommended" class="px-4 lg:px-8 mx-0 lg:mx-8 pb-6">
+            <h2 class="text-900 font-normal mb-2">Também podes gostar</h2>
+            <p class="text-600 text-xl mt-0 mb-4">Outros eventos disponíveis na Mticket</p>
+
+            <div class="grid">
+                <div class="col-12 md:col-6 xl:col-3" v-for="item in recommended" :key="item.id">
+                    <router-link :to="'/eventos/' + item.slug" class="event-card">
+                        <div class="event-card__media">
+                            <img
+                                :src="imageSrc(item)"
+                                :alt="item.name"
+                                class="event-card__image"
+                                @error="markBrokenImage(`event-${item.id}`)"
+                            />
+                        </div>
+                        <div class="event-card__body">
+                            <div class="event-card__meta">
+                                <span>{{ item.user?.company_name || item.user?.name }}</span>
+                                <Tag :value="getValue(item.end_date)" :severity="getSeverity(item.end_date)" />
+                            </div>
+                            <h3 class="event-card__title">{{ item.name }}</h3>
+                            <p class="event-card__location">
+                                <i class="pi pi-map-marker mr-1" />
+                                {{ eventLocation(item) }}
+                            </p>
+                            <div class="event-card__footer">
+                                <div>
+                                    <div class="event-card__date">{{ moment(item.start_date).format('LL') }}</div>
+                                    <div class="event-card__price">{{ formatPrice(item) }}</div>
+                                </div>
+                                <Tag v-if="item.type?.name" :value="item.type.name" severity="info" />
+                            </div>
+                        </div>
+                    </router-link>
+                </div>
+            </div>
+        </section>
     </div>
 </template>
+
+<style scoped>
+.event-hero {
+    position: relative;
+    min-height: 18rem;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    background-color: #0b3d91;
+    background-image: var(--hero-image, linear-gradient(135deg, #0b3d91 0%, #1e6fe3 55%, #4f9cf8 100%));
+    background-size: cover;
+    background-position: center;
+    animation: hero-fade 0.6s ease-out;
+}
+
+.event-hero__veil {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(8, 28, 68, 0.35) 0%, rgba(8, 28, 68, 0.82) 100%);
+}
+
+.event-hero__content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    padding-top: 3.5rem;
+    padding-bottom: 2.25rem;
+}
+
+.event-hero__back {
+    display: inline-flex;
+    align-items: center;
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.event-hero__title {
+    margin: 0 0 0.75rem;
+    color: #fff;
+    font-size: clamp(1.75rem, 4vw, 2.75rem);
+    font-weight: 700;
+    max-width: 20ch;
+    line-height: 1.15;
+    animation: rise-in 0.65s ease-out both;
+}
+
+.event-hero__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 1.5rem;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.05rem;
+}
+
+.detail-panel {
+    border: 1px solid var(--surface-border);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    background: var(--surface-0);
+}
+
+.detail-panel__image {
+    width: 100%;
+    max-height: 28rem;
+    object-fit: cover;
+    border-radius: 0.85rem;
+    background: #e8eef7;
+}
+
+.detail-panel__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    margin-top: 1rem;
+    color: #64748b;
+}
+
+.detail-title {
+    margin: 0 0 0.75rem;
+    font-size: 1.35rem;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.detail-subtitle {
+    margin: 0 0 0.4rem;
+    font-size: 1.05rem;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.detail-text {
+    margin: 0 0 1rem;
+    color: #475569;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.ticket-list,
+.lineup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.ticket-row,
+.lineup-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.75rem;
+    background: #f8fafc;
+    border: 1px solid var(--surface-border);
+}
+
+.ticket-row__name {
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.ticket-row__desc {
+    margin-top: 0.2rem;
+    color: #64748b;
+    font-size: 0.95rem;
+}
+
+.ticket-row__price {
+    font-weight: 700;
+    color: #2563eb;
+    white-space: nowrap;
+}
+
+.buy-card {
+    position: sticky;
+    top: 1.25rem;
+    border: 1px solid var(--surface-border);
+    border-radius: 1rem;
+    padding: 1.35rem;
+    background: var(--surface-0);
+    box-shadow: 0 10px 28px rgba(15, 40, 80, 0.08);
+}
+
+.buy-card__price {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #2563eb;
+    margin-bottom: 0.85rem;
+}
+
+.buy-card__date,
+.buy-card__location,
+.buy-card__tickets {
+    margin: 0 0 0.65rem;
+    color: #475569;
+}
+
+.event-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid var(--surface-border);
+    border-radius: 1rem;
+    overflow: hidden;
+    background: var(--surface-0);
+    height: 100%;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.event-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 28px rgba(15, 40, 80, 0.1);
+}
+
+.event-card__media {
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    background: #e8eef7;
+}
+
+.event-card__image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.45s ease;
+}
+
+.event-card:hover .event-card__image {
+    transform: scale(1.05);
+}
+
+.event-card__body {
+    padding: 1rem 1.1rem 1.15rem;
+}
+
+.event-card__meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.event-card__title {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+    line-height: 1.3;
+    color: #0f172a;
+}
+
+.event-card__location {
+    margin: 0 0 1rem;
+    color: #475569;
+    font-size: 0.9rem;
+}
+
+.event-card__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 0.75rem;
+}
+
+.event-card__date {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.event-card__price {
+    margin-top: 0.25rem;
+    color: #2563eb;
+    font-weight: 700;
+}
+
+.empty-block {
+    border: 1px dashed var(--surface-border);
+    border-radius: 1rem;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    background: var(--surface-50, #f8fafc);
+}
+
+@keyframes hero-fade {
+    from {
+        opacity: 0.65;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes rise-in {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 991px) {
+    .buy-card {
+        position: static;
+    }
+}
+</style>

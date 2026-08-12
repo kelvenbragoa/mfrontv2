@@ -1,25 +1,20 @@
 <script setup>
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import { baseURL, storageURL } from '@/service/ApiConstant';
-import { onMounted, ref } from 'vue';
 import axios from 'axios';
-import { useForm } from 'vee-validate';
-import * as yup from 'yup';
 import { useToast } from 'primevue/usetoast';
-import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
 import moment from 'moment';
 
 const router = useRouter();
-const isLoadingDiv = ref(true);
-const isLoadingButton = ref(false);
-const loadingButtonDelete = ref(false);
-const retriviedData = ref();
 const toast = useToast();
-const provinces = ref([]);
-const cities = ref([]);
-const typeevent = ref([]);
-const categories = ref([]);
+
+const eventId = router.currentRoute.value.params.id;
+
+const isLoading = ref(true);
+const isRefreshing = ref(false);
+const loadError = ref(null);
+const event = ref(null);
 const tickets = ref([]);
 const invites = ref([]);
 const packages = ref([]);
@@ -28,713 +23,771 @@ const protocols = ref([]);
 const barmans = ref([]);
 const products = ref([]);
 const lineups = ref([]);
-const dataIdBeingDeleted = ref(0);
-const dataIdBeingCopied = ref(0);
+const imageBroken = ref(false);
 
-//DELETE TICKET
-const displayConfirmationTicket = ref(false);
-const closeConfirmationTicket = () => {
-    displayConfirmationTicket.value = false;
-};
-const confirmDeletionTicket = (id) => {
-    displayConfirmationTicket.value = true;
-    dataIdBeingDeleted.value = id;
-};
+const deleteDialog = ref(false);
+const deleteTarget = ref(null);
+const isDeleting = ref(false);
 
-const deleteDataTicket = () => {
-    loadingButtonDelete.value = true;
+const copyDialog = ref(false);
+const copyTarget = ref(null);
+const isCopying = ref(false);
 
-    axios
-        .delete(`${baseURL}/promotor-tickets/${dataIdBeingDeleted.value}`)
-        .then(() => {
-            tickets.value = tickets.value.filter((data) => data.id !== dataIdBeingDeleted.value);
-            closeConfirmationTicket();
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            loadingButtonDelete.value = false;
-        })
-        .finally(() => {
-            loadingButtonDelete.value = false;
-        });
-};
-//DELETE INVITE
-const displayConfirmationInvite = ref(false);
-const closeConfirmationInvite = () => {
-    displayConfirmationInvite.value = false;
-};
-const confirmDeletionInvite = (id) => {
-    displayConfirmationInvite.value = true;
-    dataIdBeingDeleted.value = id;
+const statusDialog = ref(false);
+const statusAction = ref(null);
+const isSavingStatus = ref(false);
+
+const statusMeta = {
+    1: { label: 'Cancelado', severity: 'danger' },
+    2: { label: 'Aprovado', severity: 'success' },
+    3: { label: 'Pendente', severity: 'warning' },
+    4: { label: 'Em revisão', severity: 'info' }
 };
 
-const deleteDataInvite = () => {
-    loadingButtonDelete.value = true;
-
-    axios
-        .delete(`${baseURL}/promotor-invites/${dataIdBeingDeleted.value}`)
-        .then(() => {
-            invites.value = invites.value.filter((data) => data.id !== dataIdBeingDeleted.value);
-            closeConfirmationInvite();
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            loadingButtonDelete.value = false;
-        })
-        .finally(() => {
-            loadingButtonDelete.value = false;
-        });
-};
-//DELETE PACKAGE
-const displayConfirmationPackage = ref(false);
-const closeConfirmationPackage = () => {
-    displayConfirmationPackage.value = false;
-};
-const confirmDeletionPackage = (id) => {
-    displayConfirmationPackage.value = true;
-    dataIdBeingDeleted.value = id;
+const collections = {
+    ticket: tickets,
+    package: packages,
+    invite: invites,
+    bar: bars,
+    lineup: lineups,
+    product: products
 };
 
-const deleteDataPackage = () => {
-    loadingButtonDelete.value = true;
-
-    axios
-        .delete(`${baseURL}/promotor-packages/${dataIdBeingDeleted.value}`)
-        .then(() => {
-            packages.value = packages.value.filter((data) => data.id !== dataIdBeingDeleted.value);
-            closeConfirmationPackage();
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            loadingButtonDelete.value = false;
-        })
-        .finally(() => {
-            loadingButtonDelete.value = false;
-        });
-};
-//DELETE BAR
-const displayConfirmationBar = ref(false);
-const closeConfirmationBar = () => {
-    displayConfirmationBar.value = false;
-};
-const confirmDeletionBar = (id) => {
-    displayConfirmationBar.value = true;
-    dataIdBeingDeleted.value = id;
+const deleteEndpoints = {
+    ticket: 'promotor-tickets',
+    package: 'promotor-packages',
+    invite: 'promotor-invites',
+    bar: 'promotor-bar',
+    lineup: 'promotor-lineups',
+    product: 'promotor-products'
 };
 
-const deleteDataBar = () => {
-    loadingButtonDelete.value = true;
-
-    axios
-        .delete(`${baseURL}/promotor-bar/${dataIdBeingDeleted.value}`)
-        .then(() => {
-            bars.value = bars.value.filter((data) => data.id !== dataIdBeingDeleted.value);
-            closeConfirmationBar();
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            loadingButtonDelete.value = false;
-        })
-        .finally(() => {
-            loadingButtonDelete.value = false;
-        });
-};
-//COPY BAR
-const displayCopyBar = ref(false);
-const closeCopyBar = () => {
-    loadingButtonDelete.value = false;
-    displayCopyBar.value = false;
-};
-const confirmCopyBar = (id) => {
-    displayCopyBar.value = true;
-    dataIdBeingCopied.value = id;
+const deleteLabels = {
+    ticket: 'bilhete',
+    package: 'pacote',
+    invite: 'convite',
+    bar: 'bar',
+    lineup: 'artista do line-up',
+    product: 'produto'
 };
 
-const copyBar = () => {
-    loadingButtonDelete.value = true;
-
-    axios
-        .get(`${baseURL}/promotor-bar/${dataIdBeingCopied.value}/copy`)
-        .then(() => {
-            getData();
-            closeCopyBar();
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            closeCopyBar();
-            loadingButtonDelete.value = false;
-        })
-        .finally(() => {
-            closeCopyBar();
-            loadingButtonDelete.value = false;
-        });
-};
-
-//DELETE LineUp
-const displayConfirmationLineUp = ref(false);
-const closeConfirmationLineUp = () => {
-    displayConfirmationLineUp.value = false;
-};
-const confirmDeletionLineUp = (id) => {
-    displayConfirmationLineUp.value = true;
-    dataIdBeingDeleted.value = id;
-};
-
-const deleteDataLineUp = () => {
-    loadingButtonDelete.value = true;
-
-    axios
-        .delete(`${baseURL}/promotor-lineup/${dataIdBeingDeleted.value}`)
-        .then(() => {
-            bars.value = bars.value.filter((data) => data.id !== dataIdBeingDeleted.value);
-            closeConfirmationLineUp();
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            loadingButtonDelete.value = false;
-        })
-        .finally(() => {
-            loadingButtonDelete.value = false;
-        });
-};
-
-//DELETE PRODUCT
-const displayConfirmationProduct = ref(false);
-const closeConfirmationProduct = () => {
-    displayConfirmationProduct.value = false;
-};
-const confirmDeletionProduct = (id) => {
-    displayConfirmationProduct.value = true;
-    dataIdBeingDeleted.value = id;
-};
-
-const deleteDataProduct = () => {
-    loadingButtonDelete.value = true;
-
-    axios
-        .delete(`${baseURL}/promotor-products/${dataIdBeingDeleted.value}`)
-        .then(() => {
-            products.value = products.value.filter((data) => data.id !== dataIdBeingDeleted.value);
-            closeConfirmationProduct();
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            loadingButtonDelete.value = false;
-        })
-        .finally(() => {
-            loadingButtonDelete.value = false;
-        });
-};
-
-function goBackUsingBack() {
-    if (router) {
-        router.back();
+const getData = async ({ silent = false } = {}) => {
+    if (silent) {
+        isRefreshing.value = true;
+    } else {
+        isLoading.value = true;
     }
-}
-const schema = yup.object({
-    name: yup.string().required().label('Name'),
-    address: yup.string().required().label('Address'),
-    city: yup.string().required().label('City'),
-    province_id: yup.string().required().label('Province')
-    // email: yup.string().required().email().label('Email address'),
-    // fullName: yup.string().required().label('Full name'),
-    // password: yup.string().required().min(6).label('Password'),
-    // passwordConfirm: yup
-    //     .string()
-    //     .oneOf([yup.ref('password')], 'Passwords must match')
-    //     .required()
-    //     .label('Password confirmation'),
-    // terms: yup.boolean().required().isTrue('You must agree to terms and conditions').label('terms agreement'),
-    // type: yup.string().required().label('Account type')
-});
 
-const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
-    validationSchema: schema
-});
+    try {
+        const response = await axios.get(`${baseURL}/promotor-eventos/${eventId}`);
+        const data = response.data;
 
-const [name] = defineField('name');
-const [address] = defineField('address');
-const [city] = defineField('city');
-const [province_id] = defineField('province_id');
+        if (!data.event) {
+            loadError.value = 'Evento não encontrado.';
+            return;
+        }
 
-const onSubmitCreateTicket = handleSubmit((values) => {
-    console.log('Submitted with', values);
-    isLoadingButton.value = true;
-    axios
-        .post(`${baseURL}/drivers`, values)
-        .then((response) => {
-            resetForm();
-            router.push({ path: '/drivers' });
-            toast.add({ severity: 'success', summary: `Successo`, detail: 'Registro criada com sucesso', life: 3000 });
-        })
-        .catch((error) => {
-            isLoadingButton.value = false;
-            toast.add({ severity: 'error', summary: `${error.response.data.message}`, detail: 'Detalhe da Mensagem', life: 3000 });
-            if (error.response.data.errors) {
-                setErrors(error.response.data.errors);
-            }
-        })
-        .finally(() => {
-            isLoadingButton.value = false;
-        });
-});
+        event.value = data.event;
+        tickets.value = data.tickets ?? [];
+        invites.value = data.invites ?? [];
+        packages.value = data.package ?? [];
+        bars.value = data.bar ?? [];
+        protocols.value = data.protocols ?? [];
+        barmans.value = data.barmans ?? [];
+        lineups.value = data.lineup ?? [];
+        products.value = data.products ?? [];
+        loadError.value = null;
+    } catch (error) {
+        const status = error?.response?.status;
 
-const getData = () => {
-    axios
-        .get(`${baseURL}/promotor-eventos/${router.currentRoute.value.params.id}`)
-        .then((response) => {
-            // toast.add({ severity: 'success', summary: 'Success Message', detail: 'Message Detail', life: 3000 });
-            retriviedData.value = response.data.event;
-            provinces.value = response.data.province;
-            cities.value = response.data.city;
-            categories.value = response.data.category;
-            typeevent.value = response.data.typeevent;
-            tickets.value = response.data.tickets;
-            invites.value = response.data.invites;
-            packages.value = response.data.package;
-            bars.value = response.data.bar;
-            protocols.value = response.data.protocols;
-            barmans.value = response.data.barmans;
-            lineups.value = response.data.lineup;
-            products.value = response.data.products;
-            isLoadingDiv.value = false;
-        })
-        .catch((error) => {
-            isLoadingDiv.value = false;
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            goBackUsingBack();
-        });
+        if (status === 404) {
+            loadError.value = 'Evento não encontrado.';
+        } else if (status === 403) {
+            loadError.value = 'Não tens permissão para ver este evento.';
+        } else {
+            loadError.value = 'Não foi possível carregar o evento. Tenta novamente.';
+        }
+    } finally {
+        isLoading.value = false;
+        isRefreshing.value = false;
+    }
 };
+
+const goBack = () => router.back();
+
+const formatCurrency = (value) =>
+    `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)} MT`;
+
+const formatDate = (value) => (value ? moment(value).format('DD/MM/YYYY') : '--');
+
+const formatTime = (value) => (value ? moment(value, 'HH:mm:ss').format('HH:mm') : '--');
+
+const dateTime = (date, time) => `${formatDate(date)}${time ? ` às ${formatTime(time)}` : ''}`;
+
+const eventImage = computed(() => {
+    if (!event.value?.image || imageBroken.value) return '/demo/images/mticket.jpg';
+    return storageURL + event.value.image;
+});
+
+const eventLocation = computed(() => {
+    if (!event.value) return '--';
+    return [event.value.city?.name, event.value.province?.name].filter(Boolean).join(', ') || event.value.address || '--';
+});
+
+const currentStatus = computed(() => {
+    if (!event.value) return null;
+    return {
+        label: event.value.status?.name || statusMeta[event.value.status_id]?.label || 'Sem estado',
+        severity: statusMeta[event.value.status_id]?.severity ?? 'info'
+    };
+});
+
+const askDelete = (type, row) => {
+    deleteTarget.value = { type, id: row.id, name: row.name };
+    deleteDialog.value = true;
+};
+
+const closeDelete = () => {
+    deleteDialog.value = false;
+    deleteTarget.value = null;
+};
+
+const confirmDelete = async () => {
+    if (!deleteTarget.value) return;
+
+    isDeleting.value = true;
+    const { type, id } = deleteTarget.value;
+
+    try {
+        await axios.delete(`${baseURL}/${deleteEndpoints[type]}/${id}`);
+        collections[type].value = collections[type].value.filter((item) => item.id !== id);
+
+        toast.add({
+            severity: 'success',
+            summary: 'Removido',
+            detail: `O ${deleteLabels[type]} foi eliminado.`,
+            life: 3000
+        });
+
+        closeDelete();
+    } catch (error) {
+        const status = error?.response?.status;
+        const detail =
+            status === 404
+                ? `Não é possível eliminar este ${deleteLabels[type]}: já existem registos associados.`
+                : 'Não foi possível eliminar. Tenta novamente.';
+
+        toast.add({ severity: 'error', summary: 'Erro', detail, life: 5000 });
+    } finally {
+        isDeleting.value = false;
+    }
+};
+
+const askCopyBar = (row) => {
+    copyTarget.value = row;
+    copyDialog.value = true;
+};
+
+const closeCopyBar = () => {
+    copyDialog.value = false;
+    copyTarget.value = null;
+};
+
+const copyBar = async () => {
+    if (!copyTarget.value) return;
+
+    isCopying.value = true;
+
+    try {
+        await axios.get(`${baseURL}/promotor-bar/${copyTarget.value.id}/copy`);
+        await getData({ silent: true });
+        toast.add({ severity: 'success', summary: 'Bar copiado', detail: 'O bar foi duplicado com os produtos.', life: 3000 });
+        closeCopyBar();
+    } catch (error) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Não foi possível copiar o bar.', life: 4000 });
+    } finally {
+        isCopying.value = false;
+    }
+};
+
+const askStatusChange = (action) => {
+    statusAction.value = action;
+    statusDialog.value = true;
+};
+
+const closeStatusDialog = () => {
+    statusDialog.value = false;
+    statusAction.value = null;
+};
+
+const applyStatusChange = async () => {
+    isSavingStatus.value = true;
+    const statusId = statusAction.value === 'approve' ? 2 : 1;
+
+    try {
+        const response = await axios.patch(`${baseURL}/admin-eventos/${eventId}/status`, { status_id: statusId });
+        event.value.status_id = response.data.event.status_id;
+        event.value.status = response.data.event.status;
+
+        toast.add({
+            severity: 'success',
+            summary: 'Estado atualizado',
+            detail: statusId === 2 ? 'Evento aprovado.' : 'Evento cancelado.',
+            life: 3000
+        });
+
+        closeStatusDialog();
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Erro',
+            detail: error?.response?.data?.message ?? 'Não foi possível atualizar o estado.',
+            life: 4000
+        });
+    } finally {
+        isSavingStatus.value = false;
+    }
+};
+
 onMounted(() => {
     getData();
 });
 </script>
+
 <template>
-    <div className="card" v-if="!isLoadingDiv">
-        <div class="col-12">
-            <div class="card-w-title">
-                <Button label="Voltar" class="mr-2 mb-2" @click="goBackUsingBack"><i class="pi pi-angle-left"></i> Voltar</Button>
-                <router-link :to="'/admin/eventos/' + retriviedData.id + '/dashboard'"
-                    ><Button label="Dashboard" class="mr-2 mb-2"><i class="pi pi-chart-bar"></i> Dashboard</Button></router-link
-                >
+    <div class="admin-event-show">
+        <div v-if="isLoading" class="card">
+            <Skeleton width="12rem" height="1.5rem" class="mb-4" />
+            <Skeleton height="10rem" class="mb-4" />
+            <Skeleton v-for="n in 4" :key="`sk-${n}`" height="3rem" class="mb-2" />
+        </div>
 
-                <!-- <h5>Evento</h5> -->
+        <div v-else-if="loadError" class="card empty-state">
+            <i class="pi pi-exclamation-triangle text-4xl text-orange-500 mb-3" />
+            <h5 class="text-900 mb-2">Não foi possível abrir o evento</h5>
+            <p class="text-600 mb-4">{{ loadError }}</p>
+            <div class="flex gap-2">
+                <Button label="Voltar" icon="pi pi-angle-left" outlined @click="goBack" />
+                <Button label="Tentar novamente" icon="pi pi-refresh" @click="getData()" />
             </div>
+        </div>
 
-            <p>Detalhes do Evento</p>
-            <div class="grid">
-                <div class="col-12 lg:col-6 xl:col-6">
-                    <div class="card mb-0">
-                        <div class="flexmb-3">
-                            <h5>Informação Geral</h5>
-
-                            <p><strong>Nome do Evento: </strong> {{ retriviedData.name }}</p>
-                            <p><strong>Província: </strong> {{ retriviedData.province.name }}</p>
-                            <p><strong>Cidade: </strong> {{ retriviedData.city.name }}</p>
-                            <p><strong>Descrição: </strong> {{ retriviedData.description }}</p>
-                            <p><strong>Categoria: </strong> {{ retriviedData.category.name }}</p>
-                            <p><strong>Tipo de Evento: </strong> {{ retriviedData.type.name }}</p>
-                            <p>
-                                <strong>Estado do evento: </strong> <Tag severity="success" v-if="retriviedData.status_id == 2">{{ retriviedData.status.name }}</Tag>
-                                <Tag severity="danger" v-if="retriviedData.status_id == 1">{{ retriviedData.status.name }}</Tag>
-                                <Tag severity="warning" v-if="retriviedData.status_id == 3">{{ retriviedData.status.name }}</Tag>
-                                <Tag severity="info" v-if="retriviedData.status_id == 4">{{ retriviedData.status.name }}</Tag>
-                            </p>
-
-                            <h5 class="mt-2 mb-2">Localização e Data do Evento</h5>
-
-                            <p><strong>Endereço: </strong> {{ retriviedData.address }}</p>
-                            <p><strong>Data Inicio: </strong> {{ retriviedData.start_date }} - {{ retriviedData.start_time }}</p>
-                            <p><strong>Data Fim: </strong> {{ retriviedData.end_date }} - {{ retriviedData.end_time }}</p>
-
-                            <h5 class="mt-2 mb-2">Info</h5>
-                            <p><strong>Email: </strong> {{ retriviedData.email }}</p>
-                            <p><strong>Telefone: </strong> {{ retriviedData.phone }}</p>
-                        </div>
+        <template v-else>
+            <div class="card">
+                <div class="flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+                    <Button label="Voltar" icon="pi pi-angle-left" text @click="goBack" />
+                    <div class="flex flex-wrap gap-2">
+                        <Button
+                            v-if="event.status_id !== 2"
+                            label="Aprovar"
+                            icon="pi pi-check"
+                            severity="success"
+                            outlined
+                            @click="askStatusChange('approve')"
+                        />
+                        <Button
+                            v-if="event.status_id !== 1"
+                            label="Cancelar evento"
+                            icon="pi pi-ban"
+                            severity="danger"
+                            outlined
+                            @click="askStatusChange('cancel')"
+                        />
+                        <router-link :to="`/admin/eventos/${event.id}/edit`">
+                            <Button label="Editar" icon="pi pi-pencil" outlined />
+                        </router-link>
+                        <router-link :to="`/admin/eventos/${event.id}/dashboard`">
+                            <Button label="Dashboard" icon="pi pi-chart-bar" />
+                        </router-link>
                     </div>
                 </div>
-                <div class="col-12 lg:col-6 xl:col-6">
-                    <div class="card mb-0">
-                        <div class="flex justify-content-between mb-3">
-                            <img :src="storageURL + retriviedData.image" alt="" weigth="500" height="500" style="border-radius: 15px" />
+
+                <div class="event-header">
+                    <img :src="eventImage" :alt="event.name" class="event-header__image" @error="imageBroken = true" />
+
+                    <div class="event-header__content">
+                        <div class="flex flex-wrap align-items-center gap-2 mb-2">
+                            <Tag :severity="currentStatus.severity" :value="currentStatus.label" />
+                            <span class="text-500">{{ event.category?.name || 'Sem categoria' }}</span>
+                            <span v-if="event.type?.name" class="text-500">· {{ event.type.name }}</span>
                         </div>
+
+                        <h4 class="mt-0 mb-2 text-900">{{ event.name }}</h4>
+
+                        <div class="event-meta">
+                            <span><i class="pi pi-user mr-2" />{{ event.user?.name || 'Promotor desconhecido' }}</span>
+                            <span><i class="pi pi-map-marker mr-2" />{{ eventLocation }}</span>
+                            <span><i class="pi pi-calendar mr-2" />{{ dateTime(event.start_date, event.start_time) }}</span>
+                            <span><i class="pi pi-clock mr-2" />Termina {{ dateTime(event.end_date, event.end_time) }}</span>
+                        </div>
+
+                        <p v-if="event.description" class="text-600 line-height-3 mt-3 mb-0">{{ event.description }}</p>
+                    </div>
+                </div>
+
+                <div class="detail-grid mt-4">
+                    <div>
+                        <span class="detail-label">Endereço</span>
+                        <span class="detail-value">{{ event.address || '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value">{{ event.email || '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Telefone</span>
+                        <span class="detail-value">{{ event.phone || '--' }}</span>
+                    </div>
+                    <div>
+                        <span class="detail-label">Taxa</span>
+                        <span class="detail-value">{{ event.tax != null ? `${event.tax}%` : '--' }}</span>
                     </div>
                 </div>
             </div>
-            <hr />
-            <h5 class="mt-2 mb-2">Bilhetes Para o Evento</h5>
-            <!-- /promotor/eventos/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/bilhetes/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Bilhete </Button>
-            </router-link>
-            <p>Esta tabela de Bilhetes contem {{ tickets.length }} Registros.</p>
-            <DataTable :value="tickets" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Tickets</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="price" sortable header="Preço"></Column>
-                <Column field="start_date" sortable header="Data Inicio">
-                    <template #body="slotProps"> {{ moment(slotProps.data.start_date).format('DD-MM-YYYY') }} - {{ slotProps.data.start_time }} </template>
-                </Column>
-                <Column field="end_date" sortable header="Data Fim">
-                    <template #body="slotProps"> {{ moment(slotProps.data.end_date).format('DD-MM-YYYY') }} - {{ slotProps.data.end_time }} </template>
-                </Column>
-                <Column field="max_qtd" sortable header="Quantidade Maxima"></Column>
-                <Column field="description" sortable header="Descrição"></Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/bilhetes/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/bilhetes/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <a href="#" @click.prevent="confirmDeletionTicket(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
-                    </template>
-                </Column>
-                <template #footer> No total são {{ tickets.length }} Bilhetes. </template>
-            </DataTable>
-            <hr />
-            <h5 class="mt-2 mb-2">Convites Para o Evento</h5>
-            <!-- /promotor/eventos/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/convites/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Convite </Button>
-            </router-link>
-            <p>Esta tabela de Convites contem {{ invites.length }} Registros.</p>
-            <DataTable :value="invites" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Convites</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+            <div class="card">
+                <div class="flex align-items-center justify-content-between mb-3">
+                    <h5 class="m-0">Conteúdo do evento</h5>
+                    <Button icon="pi pi-refresh" text rounded :loading="isRefreshing" @click="getData({ silent: true })" />
+                </div>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="description" sortable header="Descrição"></Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/convites/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/convites/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <a href="#" @click.prevent="confirmDeletionInvite(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
-                    </template>
-                </Column>
-                <template #footer> No total são {{ invites.length }} Convites. </template>
-            </DataTable>
-            <hr />
-            <h5 class="mt-2 mb-2">Pacotes Para o Evento</h5>
-            <!-- /promotor/eventos/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/pacotes/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Pacotes </Button>
-            </router-link>
-            <p>Esta tabela de Pacotes contem {{ packages.length }} Registros.</p>
-            <DataTable :value="packages" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Pacotes</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+                <TabView>
+                    <TabPanel :header="`Bilhetes (${tickets.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/bilhetes/create`">
+                                <Button label="Criar bilhete" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="price" sortable header="Preço"></Column>
-                <Column field="description" sortable header="Descrição"></Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/pacotes/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/pacotes/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <a href="#" @click.prevent="confirmDeletionPackage(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
-                    </template>
-                </Column>
-                <template #footer> No total são {{ tickets.length }} Pacotes. </template>
-            </DataTable>
+                        <DataTable v-if="tickets.length" :value="tickets" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column header="Preço" sortable field="price">
+                                <template #body="slotProps">{{ formatCurrency(slotProps.data.price) }}</template>
+                            </Column>
+                            <Column header="Início">
+                                <template #body="slotProps">{{ dateTime(slotProps.data.start_date, slotProps.data.start_time) }}</template>
+                            </Column>
+                            <Column header="Fim">
+                                <template #body="slotProps">{{ dateTime(slotProps.data.end_date, slotProps.data.end_time) }}</template>
+                            </Column>
+                            <Column field="max_qtd" header="Qtd. máxima" sortable />
+                            <Column header="Ações" style="width: 9rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/bilhetes/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/bilhetes/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                        <Button
+                                            icon="pi pi-trash"
+                                            text
+                                            rounded
+                                            severity="danger"
+                                            v-tooltip.top="'Eliminar'"
+                                            @click="askDelete('ticket', slotProps.data)"
+                                        />
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Ainda não há bilhetes criados para este evento.</p>
+                    </TabPanel>
 
-            <hr />
-            <h5 class="mt-2 mb-2">Bar Para o Evento</h5>
-            <!-- /promotor/eventos/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/bar/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Bar </Button>
-            </router-link>
-            <p>Esta tabela de Bares contem {{ bars.length }} Registros.</p>
-            <DataTable :value="bars" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Bares</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+                    <TabPanel :header="`Pacotes (${packages.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/pacotes/create`">
+                                <Button label="Criar pacote" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="products" header="Nº Produtos">
-                    <template #body="slotProps">
-                        {{ slotProps.data.products.length }}
-                    </template>
-                </Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/bar/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/bar/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <a href="#" @click.prevent="confirmDeletionBar(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
-                        <a href="#" @click.prevent="confirmCopyBar(slotProps.data.id)" class="mr-2"><i class="pi pi-copy"></i></a>
-                    </template>
-                </Column>
-                <template #footer> No total são {{ tickets.length }} Bares. </template>
-            </DataTable>
-            <hr />
-            <h5 class="mt-2 mb-2">LineUps Para o Evento</h5>
-            <!-- /promotor/eventos/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/lineup/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar LineUp </Button>
-            </router-link>
-            <p>Esta tabela de LineUps contem {{ lineups.length }} Registros.</p>
-            <DataTable :value="lineups" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">LineUps</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+                        <DataTable v-if="packages.length" :value="packages" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column header="Preço" sortable field="price">
+                                <template #body="slotProps">{{ formatCurrency(slotProps.data.price) }}</template>
+                            </Column>
+                            <Column field="description" header="Descrição" />
+                            <Column header="Ações" style="width: 9rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/pacotes/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/pacotes/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                        <Button
+                                            icon="pi pi-trash"
+                                            text
+                                            rounded
+                                            severity="danger"
+                                            v-tooltip.top="'Eliminar'"
+                                            @click="askDelete('package', slotProps.data)"
+                                        />
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Sem pacotes criados.</p>
+                    </TabPanel>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="description" sortable header="Descrição"></Column>
-                <Column field="start_date" sortable header="Data Inicio">
-                    <template #body="slotProps"> {{ moment(slotProps.data.start_date).format('DD-MM-YYYY') }} - {{ slotProps.data.start_time }} </template>
-                </Column>
-                <Column field="end_date" sortable header="Data Fim">
-                    <template #body="slotProps"> {{ moment(slotProps.data.end_date).format('DD-MM-YYYY') }} - {{ slotProps.data.end_time }} </template>
-                </Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/lineup/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/lineup/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <a href="#" @click.prevent="confirmDeletionBar(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
-                    </template>
-                </Column>
-                <template #footer> No total são {{ lineups.length }} Lineups. </template>
-            </DataTable>
+                    <TabPanel :header="`Convites (${invites.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/convites/create`">
+                                <Button label="Criar convite" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
 
-            <hr />
-            <h5 class="mt-2 mb-2">Productos Para o Evento</h5>
-            <!-- /promotor/eventos/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/produtos/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Produto </Button>
-            </router-link>
-            <p>Esta tabela de Produtos contem {{ products.length }} Registros.</p>
-            <DataTable :value="products" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Productos</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+                        <DataTable v-if="invites.length" :value="invites" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column field="description" header="Descrição" />
+                            <Column header="Ações" style="width: 9rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/convites/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/convites/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                        <Button
+                                            icon="pi pi-trash"
+                                            text
+                                            rounded
+                                            severity="danger"
+                                            v-tooltip.top="'Eliminar'"
+                                            @click="askDelete('invite', slotProps.data)"
+                                        />
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Sem convites criados.</p>
+                    </TabPanel>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="buy_price" sortable header="Compra">
-                    <template #body="slotProps"> {{ slotProps.data.buy_price }} MT </template>
-                </Column>
-                <Column field="sell_price" sortable header="Venda">
-                    <template #body="slotProps"> {{ slotProps.data.sell_price }} MT </template>
-                </Column>
-                <Column field="qtd" sortable header="Qtd"></Column>
-                <Column field="barstore.name" sortable header="Bar"></Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/produtos/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/produtos/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <a href="#" @click.prevent="confirmDeletionProduct(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a>
-                    </template>
-                </Column>
-                <template #footer> No total são {{ products.length }} Bares. </template>
-            </DataTable>
-            <hr />
-            <h5 class="mt-2 mb-2">Protocolos Para o Evento</h5>
-            <!-- /promotor/protocolos/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/protocolos/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Protocolo </Button>
-            </router-link>
-            <p>Esta tabela de Protocolos contem {{ protocols.length }} Registros.</p>
-            <DataTable :value="protocols" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Protocolos</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+                    <TabPanel :header="`Line-up (${lineups.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/lineup/create`">
+                                <Button label="Adicionar ao line-up" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="mobile" sortable header="Telefone"></Column>
-                <Column field="bi" sortable header="BI"></Column>
-                <Column field="user" sortable header="Usuário"></Column>
-                <Column field="password" sortable header="Password"></Column>
-                <Column field="tickets_count" sortable header="Bilhetes Validados"></Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/protocolos/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/protocolos/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <!-- <a href="#" @click.prevent="confirmDeletionBar(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a> -->
-                    </template>
-                </Column>
-                <template #footer> No total são {{ protocols.length }} Protocolos. </template>
-            </DataTable>
-            <hr />
-            <h5 class="mt-2 mb-2">Barmans Para o Evento</h5>
-            <!-- /promotor/barmans/:id/bilhetes/create -->
-            <router-link :to="'/admin/eventos/' + retriviedData.id + '/barmans/create'">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Barman </Button>
-            </router-link>
-            <p>Esta tabela de Barmans contem {{ protocols.length }} Registros.</p>
-            <DataTable :value="barmans" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Barmans</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+                        <DataTable v-if="lineups.length" :value="lineups" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column field="description" header="Descrição" />
+                            <Column header="Início">
+                                <template #body="slotProps">{{ dateTime(slotProps.data.start_date, slotProps.data.start_time) }}</template>
+                            </Column>
+                            <Column header="Fim">
+                                <template #body="slotProps">{{ dateTime(slotProps.data.end_date, slotProps.data.end_time) }}</template>
+                            </Column>
+                            <Column header="Ações" style="width: 9rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/lineup/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/lineup/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                        <Button
+                                            icon="pi pi-trash"
+                                            text
+                                            rounded
+                                            severity="danger"
+                                            v-tooltip.top="'Eliminar'"
+                                            @click="askDelete('lineup', slotProps.data)"
+                                        />
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Sem artistas no line-up.</p>
+                    </TabPanel>
 
-                <Column field="name" sortable header="Nome"></Column>
-                <Column field="mobile" sortable header="Telefone"></Column>
-                <Column field="bi" sortable header="BI"></Column>
-                <Column field="user" sortable header="Usuário"></Column>
-                <Column field="password" sortable header="Password"></Column>
-                <Column field="barstore.name" sortable header="Bar"></Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/barmans/' + slotProps.data.id + '/edit'" class="mr-2"><i class="pi pi-file-edit"></i></router-link>
-                        <router-link :to="'/admin/eventos/' + retriviedData.id + '/barmans/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>
-                        <!-- <a href="#" @click.prevent="confirmDeletionBar(slotProps.data.id)" class="mr-2"><i class="pi pi-trash"></i></a> -->
-                    </template>
-                </Column>
-                <template #footer> No total são {{ barmans.length }} Barmans. </template>
-            </DataTable>
-        </div>
+                    <TabPanel :header="`Bares (${bars.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/bar/create`">
+                                <Button label="Criar bar" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
+
+                        <DataTable v-if="bars.length" :value="bars" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column header="Nº produtos">
+                                <template #body="slotProps">{{ slotProps.data.products?.length ?? 0 }}</template>
+                            </Column>
+                            <Column header="Ações" style="width: 12rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/bar/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/bar/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                        <Button
+                                            icon="pi pi-copy"
+                                            text
+                                            rounded
+                                            severity="secondary"
+                                            v-tooltip.top="'Duplicar bar'"
+                                            @click="askCopyBar(slotProps.data)"
+                                        />
+                                        <Button
+                                            icon="pi pi-trash"
+                                            text
+                                            rounded
+                                            severity="danger"
+                                            v-tooltip.top="'Eliminar'"
+                                            @click="askDelete('bar', slotProps.data)"
+                                        />
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Sem bares criados.</p>
+                    </TabPanel>
+
+                    <TabPanel :header="`Produtos (${products.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/produtos/create`">
+                                <Button label="Criar produto" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
+
+                        <DataTable v-if="products.length" :value="products" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column header="Compra" sortable field="buy_price">
+                                <template #body="slotProps">{{ formatCurrency(slotProps.data.buy_price) }}</template>
+                            </Column>
+                            <Column header="Venda" sortable field="sell_price">
+                                <template #body="slotProps">{{ formatCurrency(slotProps.data.sell_price) }}</template>
+                            </Column>
+                            <Column field="qtd" header="Qtd" sortable />
+                            <Column field="barstore.name" header="Bar" sortable />
+                            <Column header="Ações" style="width: 9rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/produtos/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/produtos/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                        <Button
+                                            icon="pi pi-trash"
+                                            text
+                                            rounded
+                                            severity="danger"
+                                            v-tooltip.top="'Eliminar'"
+                                            @click="askDelete('product', slotProps.data)"
+                                        />
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Sem produtos registados.</p>
+                    </TabPanel>
+
+                    <TabPanel :header="`Protocolos (${protocols.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/protocolos/create`">
+                                <Button label="Criar protocolo" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
+
+                        <DataTable v-if="protocols.length" :value="protocols" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column field="mobile" header="Telefone" />
+                            <Column field="bi" header="BI" />
+                            <Column field="user" header="Utilizador" />
+                            <Column field="tickets_count" header="Bilhetes validados" sortable />
+                            <Column header="Ações" style="width: 7rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/protocolos/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/protocolos/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Sem protocolos atribuídos.</p>
+                    </TabPanel>
+
+                    <TabPanel :header="`Barmans (${barmans.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/barmans/create`">
+                                <Button label="Criar barman" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
+
+                        <DataTable v-if="barmans.length" :value="barmans" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column field="mobile" header="Telefone" />
+                            <Column field="bi" header="BI" />
+                            <Column field="user" header="Utilizador" />
+                            <Column field="barstore.name" header="Bar" sortable />
+                            <Column header="Ações" style="width: 7rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/barmans/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/barmans/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Sem barmans atribuídos.</p>
+                    </TabPanel>
+                </TabView>
+            </div>
+        </template>
+
+        <Dialog v-model:visible="deleteDialog" header="Eliminar registo" :style="{ width: '26rem' }" :modal="true" :draggable="false">
+            <div v-if="deleteTarget" class="flex align-items-start gap-3">
+                <i class="pi pi-exclamation-triangle text-2xl text-orange-500 mt-1" />
+                <span class="line-height-3">
+                    Eliminar o {{ deleteLabels[deleteTarget.type] }} <strong>{{ deleteTarget.name }}</strong>? Esta ação não pode ser desfeita.
+                </span>
+            </div>
+            <template #footer>
+                <Button label="Voltar" text :disabled="isDeleting" @click="closeDelete" />
+                <Button label="Eliminar" icon="pi pi-trash" severity="danger" :loading="isDeleting" @click="confirmDelete" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="copyDialog" header="Duplicar bar" :style="{ width: '26rem' }" :modal="true" :draggable="false">
+            <div v-if="copyTarget" class="flex align-items-start gap-3">
+                <i class="pi pi-copy text-2xl text-primary mt-1" />
+                <span class="line-height-3">
+                    Criar uma cópia do bar <strong>{{ copyTarget.name }}</strong> com os mesmos produtos?
+                </span>
+            </div>
+            <template #footer>
+                <Button label="Voltar" text :disabled="isCopying" @click="closeCopyBar" />
+                <Button label="Duplicar" icon="pi pi-copy" :loading="isCopying" @click="copyBar" />
+            </template>
+        </Dialog>
+
+        <Dialog v-model:visible="statusDialog" header="Confirmar alteração" :style="{ width: '28rem' }" :modal="true" :draggable="false">
+            <div class="flex align-items-start gap-3">
+                <i
+                    class="pi text-2xl mt-1"
+                    :class="statusAction === 'approve' ? 'pi-check-circle text-green-500' : 'pi-exclamation-triangle text-orange-500'"
+                />
+                <span class="line-height-3">
+                    {{
+                        statusAction === 'approve'
+                            ? 'Aprovar este evento? Passa a ficar visível no site e à venda.'
+                            : 'Cancelar este evento? Deixa de aparecer no site e de vender bilhetes.'
+                    }}
+                </span>
+            </div>
+            <template #footer>
+                <Button label="Voltar" text :disabled="isSavingStatus" @click="closeStatusDialog" />
+                <Button
+                    :label="statusAction === 'approve' ? 'Aprovar' : 'Cancelar evento'"
+                    :severity="statusAction === 'approve' ? 'success' : 'danger'"
+                    :loading="isSavingStatus"
+                    @click="applyStatusChange"
+                />
+            </template>
+        </Dialog>
     </div>
-    <div class="text-center" v-else>
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
-        <p>Por Favor Aguarde...</p>
-    </div>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmationTicket" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmationTicket" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteDataTicket" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmationInvite" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmationInvite" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteDataInvite" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmationBar" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmationBar" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteDataBar" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmationPackage" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmationPackage" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteDataPackage" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmationLineUp" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmationLineUp" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteDataLineUp" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmationProduct" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmationProduct" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteDataProduct" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
-
-    <Dialog header="Copiar o bar" v-model:visible="displayCopyBar" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeCopyBar" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="copyBar" :disabled="loadingButtonDelete" class="p-button-text" autofocus />
-            <ProgressSpinner style="width: 35px; height: 35px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" v-if="loadingButtonDelete" />
-        </template>
-    </Dialog>
 </template>
+
+<style scoped>
+.event-header {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.event-header__image {
+    width: 16rem;
+    height: 11rem;
+    border-radius: 0.85rem;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.event-header__content {
+    flex: 1;
+    min-width: 0;
+}
+
+.event-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    color: #64748b;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--surface-border);
+}
+
+.detail-label {
+    display: block;
+    color: #64748b;
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}
+
+.detail-value {
+    color: var(--text-color);
+    font-weight: 500;
+    word-break: break-word;
+}
+
+.tab-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.tab-empty {
+    text-align: center;
+    color: #64748b;
+    padding: 2.5rem 1rem;
+    margin: 0;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+@media (max-width: 991px) {
+    .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 767px) {
+    .event-header {
+        flex-direction: column;
+    }
+
+    .event-header__image {
+        width: 100%;
+        height: 12rem;
+    }
+}
+</style>

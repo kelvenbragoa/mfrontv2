@@ -21,8 +21,8 @@ const smoothScroll = (id) => {
                 <div class="grid text-center md:text-left">
                     <div class="col-12 md:col-2">
                         <h4 class="font-medium text-2xl line-height-3 mb-3 text-900">Mticket</h4>
-                        <a class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Sobre nós</a>
-                        <a class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Perguntas Frequentes</a>
+                        <router-link to="/sobre-nos" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Sobre nós</router-link>
+                        <router-link to="/faq" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Perguntas Frequentes</router-link>
                     </div>
                     <div class="col-12 md:col-3 mt-4 md:mt-0">
                         <router-link to="/privacy" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Aspectos Legais</router-link>

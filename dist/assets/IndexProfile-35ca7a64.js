@@ -1,0 +1,1 @@
+import{P as o}from"./ProfilePage-e85db6b4.js";import{a as r,g as e}from"./index-f8a4e567.js";import"./APIConstant-bb4f663e.js";import"./index.esm-9dcc60b8.js";import"./_commonjsHelpers-725317a4.js";const _={__name:"IndexProfile",setup(t){return(a,m)=>(r(),e(o,{"default-role-label":"Promotor"}))}};export{_ as default};

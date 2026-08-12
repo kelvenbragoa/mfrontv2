@@ -1,108 +1,132 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
-import { baseURL, storageURL } from '@/service/ApiConstant';
+import { computed, onMounted, ref, watch } from 'vue';
+import { baseURL } from '@/service/ApiConstant';
 import axios from 'axios';
-import { useForm } from 'vee-validate';
-import * as yup from 'yup';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { debounce } from 'lodash';
-import { Bootstrap4Pagination, TailwindPagination } from 'laravel-vue-pagination';
 
-import Paginator from 'primevue/paginator';
-
-const router = useRouter();
-const isLoadingDiv = ref(true);
-const isLoadingButton = ref(false);
-const isLoadingButtonExport = ref(false);
-const retriviedData = ref({ data: [] });
-const expandedRows = ref([]);
 const toast = useToast();
-const searchQuery = ref(null);
-const displayConfirmation = ref(false);
-function goBackUsingBack() {
-    if (router) {
-        router.back();
+
+const isLoading = ref(true);
+const isRefreshing = ref(false);
+const loadError = ref(null);
+const retriviedData = ref({ data: [] });
+const summary = ref({ pending: 0, amount: 0 });
+const searchQuery = ref('');
+const currentPage = ref(1);
+const rowsPerPage = ref(20);
+const first = ref(0);
+
+const confirmDialog = ref(false);
+const confirmTarget = ref(null);
+const isConfirming = ref(false);
+
+const getData = async (page = 1, { silent = false } = {}) => {
+    currentPage.value = page;
+    first.value = (page - 1) * rowsPerPage.value;
+
+    if (silent) {
+        isRefreshing.value = true;
+    } else {
+        isLoading.value = true;
     }
-}
-const loadingButtonDelete = ref(false);
-let dataIdBeingDeleted = ref(null);
 
-const getData = async (page = 1) => {
-    axios
-        .get(`${baseURL}/admin-transacoes?page=${page}`, {
+    try {
+        const response = await axios.get(`${baseURL}/admin-transacoes`, {
             params: {
-                query: searchQuery.value
+                page,
+                per_page: rowsPerPage.value,
+                query: searchQuery.value || null
             }
-        })
-        .then((response) => {
-            retriviedData.value = response.data.transaction;
-            isLoadingDiv.value = false;
-        })
-        .catch((error) => {
-            isLoadingDiv.value = false;
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            goBackUsingBack();
         });
-};
-watch(
-    searchQuery,
-    debounce(() => {
-        getData();
-    }, 300)
-);
 
-const expandAll = () => {
-    expandedRows.value = retriviedData.value.data.reduce((acc, p) => (acc[p.id] = true) && acc, {});
+        retriviedData.value = response.data.transaction;
+        summary.value = response.data.summary ?? summary.value;
+        loadError.value = null;
+    } catch (error) {
+        const status = error?.response?.status;
+
+        if (status === 403) {
+            loadError.value = 'Não tens permissão para gerir transações.';
+        } else if (status === 401) {
+            loadError.value = 'A sessão expirou. Inicia sessão novamente.';
+        } else {
+            loadError.value = 'Não foi possível carregar as transações. Tenta novamente.';
+        }
+    } finally {
+        isLoading.value = false;
+        isRefreshing.value = false;
+    }
 };
-const collapseAll = () => {
-    expandedRows.value = null;
+
+const onPage = (event) => {
+    rowsPerPage.value = event.rows;
+    first.value = event.first;
+    const page = Math.floor(event.first / event.rows) + 1;
+    getData(page, { silent: true });
+};
+
+const debouncedSearch = debounce(() => getData(1, { silent: true }), 350);
+watch(searchQuery, () => debouncedSearch());
+
+const formatCurrency = (value) =>
+    `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)} MT`;
+
+const formatNumber = (value) => new Intl.NumberFormat('pt-PT').format(Number(value) || 0);
+
+const formatDateTime = (value) => (value ? moment(value).format('DD/MM/YYYY HH:mm') : '--');
+
+const ticketCount = (row) => row.sell?.selldetails?.length ?? 0;
+
+const askConfirmation = (row) => {
+    confirmTarget.value = row;
+    confirmDialog.value = true;
 };
 
 const closeConfirmation = () => {
-    displayConfirmation.value = false;
-};
-const confirmDeletion = (id) => {
-    displayConfirmation.value = true;
-    dataIdBeingDeleted.value = id;
+    confirmDialog.value = false;
+    confirmTarget.value = null;
 };
 
-const confirmTransaction = (id) => {
+const confirmTransaction = async () => {
+    if (!confirmTarget.value) return;
 
-    axios
-        .get(`${baseURL}/admin-transacoes/${id}`)
-        .then((response) => {
-            retriviedData.value = response.data.transaction;
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-        })
-        .finally(() => {
+    isConfirming.value = true;
+    const targetId = confirmTarget.value.id;
+
+    try {
+        const response = await axios.post(`${baseURL}/admin-transacoes/${targetId}/confirmar`);
+
+        retriviedData.value.data = retriviedData.value.data.filter((item) => item.id !== targetId);
+        if (retriviedData.value.total) retriviedData.value.total -= 1;
+        summary.value = response.data.summary ?? summary.value;
+
+        toast.add({
+            severity: response.data.email_sent === false ? 'warn' : 'success',
+            summary: 'Transação confirmada',
+            detail: response.data.message,
+            life: 5000
         });
+
+        closeConfirmation();
+
+        if (!retriviedData.value.data.length && currentPage.value > 1) {
+            getData(currentPage.value - 1, { silent: true });
+        }
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Erro',
+            detail: error?.response?.data?.message ?? 'Não foi possível confirmar a transação.',
+            life: 5000
+        });
+    } finally {
+        isConfirming.value = false;
+    }
 };
 
-// const downloadReport = () => {
-//     isLoadingButtonExport.value = true;
-//     axios
-//         .get(`${baseURL}/export/company`, { responseType: 'blob' })
-//         .then((response) => {
-//             const url = window.URL.createObjectURL(new Blob([response.data]));
-//             const link = document.createElement('a');
-//             link.href = url;
-//             link.setAttribute('download', 'company.xlsx');
-//             document.body.appendChild(link);
-//             link.click();
-
-//             toast.add({ severity: 'success', detail: `Relatorio baixado com sucesso`, summary: 'Sucesso', life: 3000 });
-//             isLoadingButtonExport.value = false;
-//         })
-//         .catch((error) => {
-//             isLoadingButtonExport.value = false;
-//             toast.add({ severity: 'error', detail: `${error}`, summary: 'Erro', life: 3000 });
-//         });
-// };
+const hasRows = computed(() => !!retriviedData.value.data?.length);
 
 onMounted(() => {
     getData();
@@ -110,85 +134,229 @@ onMounted(() => {
 </script>
 
 <template>
-    <div className="card" v-if="!isLoadingDiv">
-        <div class="col-12">
-            <div class="card-w-title">
-                <h5>Eventos</h5>
-                <IconField iconPosition="left">
+    <div class="admin-transactions">
+        <div class="flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+            <div>
+                <h4 class="m-0 text-900">Transações por confirmar</h4>
+                <span class="text-600">Pagamentos M-Pesa que ficaram pendentes e ainda não geraram bilhetes</span>
+            </div>
+            <Button
+                icon="pi pi-refresh"
+                label="Atualizar"
+                outlined
+                :loading="isRefreshing"
+                @click="getData(currentPage, { silent: true })"
+            />
+        </div>
+
+        <div class="grid">
+            <div class="col-12 md:col-6 xl:col-3">
+                <div class="card mb-0">
+                    <span class="block text-500 text-sm mb-2">Transações pendentes</span>
+                    <span class="text-900 font-medium text-2xl">{{ formatNumber(summary.pending) }}</span>
+                </div>
+            </div>
+            <div class="col-12 md:col-6 xl:col-3">
+                <div class="card mb-0">
+                    <span class="block text-500 text-sm mb-2">Valor em espera</span>
+                    <span class="text-900 font-medium text-2xl">{{ formatCurrency(summary.amount) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="flex flex-wrap align-items-center justify-content-between gap-3">
+                <IconField iconPosition="left" class="search-field">
                     <InputIcon class="pi pi-search" />
-                    <InputText type="text" placeholder="Procurar ..." v-model="searchQuery" />
+                    <InputText v-model="searchQuery" placeholder="Procurar por referência, nome, email ou telemóvel..." class="w-full" />
                 </IconField>
+                <Button v-if="searchQuery" label="Limpar" icon="pi pi-times" text @click="searchQuery = ''" />
             </div>
 
-            <h5>Registro das Transações Temporárias</h5>
+            <Message severity="info" :closable="false" class="mt-3">
+                Ao confirmar, a encomenda passa a venda definitiva, os bilhetes são emitidos e enviados por email ao comprador.
+            </Message>
 
-            <!-- <router-link to="/admin/eventos/create">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Novo Registro </Button>
-            </router-link> -->
-            <!-- <Button label="Baixar" class="mr-2 mb-2" @click="downloadReport()" :disabled="isLoadingButtonExport"> <i :class="!isLoadingButtonExport ? 'pi pi-arrow-down' : 'pi pi-spinner'"></i> Baixar Registro </Button> -->
+            <div v-if="isLoading" class="mt-4">
+                <Skeleton v-for="n in 6" :key="`row-${n}`" height="3.5rem" class="mb-2" />
+            </div>
 
-            <p>Esta tabela contem {{ retriviedData.data ? retriviedData.total : 0 }} Registros.</p>
+            <div v-else-if="loadError" class="empty-state">
+                <i class="pi pi-exclamation-triangle text-4xl text-orange-500 mb-3" />
+                <h5 class="text-900 mb-2">Não foi possível carregar</h5>
+                <p class="text-600 mb-4">{{ loadError }}</p>
+                <Button label="Tentar novamente" icon="pi pi-refresh" @click="getData()" />
+            </div>
 
-            <DataTable :value="retriviedData.data" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Eventos</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+            <template v-else>
+                <p class="text-600 mt-3 mb-3">
+                    {{ formatNumber(retriviedData.total || 0) }}
+                    {{ (retriviedData.total || 0) === 1 ? 'transação encontrada' : 'transações encontradas' }}
+                </p>
 
-                <Column field="id" sortable header="ID"></Column>
-                <Column field="reference" sortable header="Referência"></Column>
-                <Column field="status" sortable header="Valor">
-                    <template #body="slotProps"> {{ slotProps.data.sell.total }} MT </template>
-                </Column>
-                <Column field="status" sortable header="Tickets">
-                    <template #body="slotProps">
-                        {{ slotProps.data.sell.selldetails.length }}
-                    </template>
-                </Column>
-                <Column field="method" sortable header="Método"></Column>
-                <Column field="sell.event.name" sortable header="Evento"></Column>
+                <DataTable
+                    v-if="hasRows"
+                    :value="retriviedData.data"
+                    lazy
+                    paginator
+                    :rows="rowsPerPage"
+                    :first="first"
+                    :totalRecords="retriviedData.total || 0"
+                    :rowsPerPageOptions="[10, 20, 50]"
+                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                    currentPageReportTemplate="A mostrar {first} a {last} de {totalRecords} transações"
+                    responsiveLayout="scroll"
+                    class="p-datatable-sm"
+                    tableStyle="min-width: 58rem"
+                    @page="onPage"
+                >
+                    <Column header="Referência">
+                        <template #body="slotProps">
+                            <span class="font-medium text-900">{{ slotProps.data.reference || '--' }}</span>
+                        </template>
+                    </Column>
 
-                <Column field="status" sortable header="Estado">
-                    <template #body="slotProps">
-                        <Tag severity="danger" v-if="slotProps.data.status == 0">Não confirmada</Tag>
-                        <!-- <Dropdown v-model="device_availability_id" :options="deviceavailability" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.device_availability_id }" disabled /> -->
-                    </template>
-                </Column>
-                <Column field="created_at" sortable header="Criado em">
-                    <template #body="slotProps">
-                        {{ moment(slotProps.data.created_at).format('DD-MM-YYYY H:mm') }}
-                    </template>
-                </Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <a href="#" @click.prevent="confirmTransaction(slotProps.data.id)"><i class="pi pi-check"></i></a>                    </template>
-                </Column>
-                <template #footer> No total são {{ retriviedData.data ? retriviedData.total : 0 }} Eventos. </template>
-            </DataTable>
-            <TailwindPagination :data="retriviedData" @pagination-change-page="getData" bg-whitebg-blue-50 style="width: 10px" />
+                    <Column header="Comprador">
+                        <template #body="slotProps">
+                            <div class="flex flex-column">
+                                <span class="text-900">{{ slotProps.data.sell?.name || 'Sem nome' }}</span>
+                                <span class="text-500 text-sm">
+                                    {{ slotProps.data.sell?.email || slotProps.data.sell?.mobile || '--' }}
+                                </span>
+                            </div>
+                        </template>
+                    </Column>
+
+                    <Column header="Evento">
+                        <template #body="slotProps">
+                            <router-link
+                                v-if="slotProps.data.sell?.event"
+                                :to="`/admin/eventos/${slotProps.data.sell.event.id}`"
+                                class="text-primary no-underline"
+                            >
+                                {{ slotProps.data.sell.event.name }}
+                            </router-link>
+                            <span v-else class="text-500">Evento indisponível</span>
+                        </template>
+                    </Column>
+
+                    <Column header="Bilhetes">
+                        <template #body="slotProps">
+                            {{ formatNumber(ticketCount(slotProps.data)) }}
+                        </template>
+                    </Column>
+
+                    <Column header="Valor">
+                        <template #body="slotProps">
+                            <span class="text-900 font-medium">{{ formatCurrency(slotProps.data.sell?.total) }}</span>
+                        </template>
+                    </Column>
+
+                    <Column header="Método">
+                        <template #body="slotProps">
+                            <span class="uppercase text-600">{{ slotProps.data.method || '--' }}</span>
+                        </template>
+                    </Column>
+
+                    <Column header="Criada em">
+                        <template #body="slotProps">
+                            {{ formatDateTime(slotProps.data.created_at) }}
+                        </template>
+                    </Column>
+
+                    <Column header="Ações" style="width: 12rem">
+                        <template #body="slotProps">
+                            <Button
+                                label="Confirmar"
+                                icon="pi pi-check"
+                                size="small"
+                                :disabled="!slotProps.data.sell"
+                                @click="askConfirmation(slotProps.data)"
+                            />
+                        </template>
+                    </Column>
+                </DataTable>
+
+                <div v-else class="empty-state">
+                    <i class="pi pi-check-circle text-4xl text-green-400 mb-3" />
+                    <h5 class="text-900 mb-2">Nada por confirmar</h5>
+                    <p class="text-600 m-0">
+                        {{ searchQuery ? 'Nenhuma transação corresponde à pesquisa.' : 'Todos os pagamentos pendentes foram tratados.' }}
+                    </p>
+                </div>
+            </template>
         </div>
-    </div>
 
-    <div class="text-center" v-else>
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
-        <p>Por Favor Aguarde...</p>
+        <Dialog
+            v-model:visible="confirmDialog"
+            header="Confirmar pagamento"
+            :style="{ width: '30rem' }"
+            :modal="true"
+            :draggable="false"
+        >
+            <div v-if="confirmTarget" class="confirm-body">
+                <p class="mt-0 mb-3 line-height-3">
+                    Vais confirmar a referência <strong>{{ confirmTarget.reference }}</strong> e emitir
+                    <strong>{{ ticketCount(confirmTarget) }}</strong> bilhete(s) para
+                    <strong>{{ confirmTarget.sell?.name || 'o comprador' }}</strong>.
+                </p>
+                <ul class="confirm-list">
+                    <li>
+                        <span class="text-500">Evento</span>
+                        <span class="text-900">{{ confirmTarget.sell?.event?.name || '--' }}</span>
+                    </li>
+                    <li>
+                        <span class="text-500">Valor</span>
+                        <span class="text-900">{{ formatCurrency(confirmTarget.sell?.total) }}</span>
+                    </li>
+                    <li>
+                        <span class="text-500">Email</span>
+                        <span class="text-900">{{ confirmTarget.sell?.email || '--' }}</span>
+                    </li>
+                </ul>
+                <p class="text-600 text-sm mt-3 mb-0">Esta ação não pode ser desfeita.</p>
+            </div>
+            <template #footer>
+                <Button label="Voltar" text :disabled="isConfirming" @click="closeConfirmation" />
+                <Button label="Confirmar e emitir" icon="pi pi-check" :loading="isConfirming" @click="confirmTransaction" />
+            </template>
+        </Dialog>
     </div>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmation" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmation" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteData" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
 </template>
+
+<style scoped>
+.search-field {
+    flex: 1 1 22rem;
+    min-width: 14rem;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+.confirm-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.confirm-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--surface-border);
+}
+
+.confirm-list li:last-child {
+    border-bottom: none;
+}
+</style>

@@ -6,6 +6,9 @@ import AppHomeLayout from '@/layouthome/AppHomeLayout.vue';
 
 const router = createRouter({
     history: createWebHistory(),
+    scrollBehavior(to, from, savedPosition) {
+        return savedPosition || { top: 0 };
+    },
     routes: [
         {
             path: '/admin/dashboard',
@@ -14,6 +17,9 @@ const router = createRouter({
                 {
                     path: '/admin/dashboard',
                     name: 'admin.dashboard',
+                    meta: {
+                        requiresAuth: true
+                    },
                     component: () => import('@/views/pages/admin/Dashboard.vue')
                 },
                 {
@@ -680,7 +686,7 @@ const router = createRouter({
             children: [
                 {
                     path: '/',
-                    name: 'home',
+                    name: 'homepage',
                     component: () => import('@/views/pages/home/home.vue')
                 },
                 {
@@ -713,6 +719,16 @@ const router = createRouter({
                     path: '/ser-promotor',
                     name: 'ser.promotor',
                     component: () => import('@/views/pages/home/serpromotor/index.vue')
+                },
+                {
+                    path: '/sobre-nos',
+                    name: 'sobre.nos',
+                    component: () => import('@/views/pages/home/sobre/index.vue')
+                },
+                {
+                    path: '/faq',
+                    name: 'faq',
+                    component: () => import('@/views/pages/home/faq/index.vue')
                 },
                 {
                     path: '/privacy',

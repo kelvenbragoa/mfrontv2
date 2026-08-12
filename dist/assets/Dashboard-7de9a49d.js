@@ -1,0 +1,1 @@
+import{E as o}from"./EventDashboard-92569831.js";import{a as r,g as a}from"./index-f8a4e567.js";import"./APIConstant-bb4f663e.js";import"./moment-a9aaa855.js";const n={__name:"Dashboard",setup(t){return(e,p)=>(r(),a(o,{scope:"promotor"}))}};export{n as default};

@@ -1,106 +1,100 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
-import { baseURL, storageURL } from '@/service/ApiConstant';
+import { computed, onMounted, ref, watch } from 'vue';
+import { baseURL } from '@/service/ApiConstant';
 import axios from 'axios';
-import { useForm } from 'vee-validate';
-import * as yup from 'yup';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { debounce } from 'lodash';
-import { Bootstrap4Pagination, TailwindPagination } from 'laravel-vue-pagination';
 
-import Paginator from 'primevue/paginator';
-
-const router = useRouter();
-const isLoadingDiv = ref(true);
-const isLoadingButton = ref(false);
-const isLoadingButtonExport = ref(false);
-const retriviedData = ref({ data: [] });
-const expandedRows = ref([]);
 const toast = useToast();
-const searchQuery = ref(null);
-const displayConfirmation = ref(false);
-function goBackUsingBack() {
-    if (router) {
-        router.back();
+
+const isLoading = ref(true);
+const isRefreshing = ref(false);
+const loadError = ref(null);
+const retriviedData = ref({ data: [] });
+const summary = ref({ total: 0, valid: 0, used: 0 });
+const searchQuery = ref('');
+const statusFilter = ref(null);
+const currentPage = ref(1);
+const rowsPerPage = ref(20);
+const first = ref(0);
+
+const statusOptions = [
+    { label: 'Válidos', value: 1 },
+    { label: 'Usados', value: 0 }
+];
+
+const getData = async (page = 1, { silent = false } = {}) => {
+    currentPage.value = page;
+    first.value = (page - 1) * rowsPerPage.value;
+
+    if (silent) {
+        isRefreshing.value = true;
+    } else {
+        isLoading.value = true;
     }
-}
-const loadingButtonDelete = ref(false);
-let dataIdBeingDeleted = ref(null);
 
-const getData = async (page = 1) => {
-    axios
-        .get(`${baseURL}/admin-tickets?page=${page}`, {
+    try {
+        const response = await axios.get(`${baseURL}/admin-tickets`, {
             params: {
-                query: searchQuery.value
+                page,
+                per_page: rowsPerPage.value,
+                query: searchQuery.value || null,
+                status: statusFilter.value
             }
-        })
-        .then((response) => {
-            retriviedData.value = response.data.tickets;
-            isLoadingDiv.value = false;
-        })
-        .catch((error) => {
-            isLoadingDiv.value = false;
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-            goBackUsingBack();
         });
-};
-watch(
-    searchQuery,
-    debounce(() => {
-        getData();
-    }, 300)
-);
 
-const expandAll = () => {
-    expandedRows.value = retriviedData.value.data.reduce((acc, p) => (acc[p.id] = true) && acc, {});
-};
-const collapseAll = () => {
-    expandedRows.value = null;
-};
+        retriviedData.value = response.data.tickets;
+        summary.value = response.data.summary ?? summary.value;
+        loadError.value = null;
+    } catch (error) {
+        const status = error?.response?.status;
 
-const closeConfirmation = () => {
-    displayConfirmation.value = false;
-};
-const confirmDeletion = (id) => {
-    displayConfirmation.value = true;
-    dataIdBeingDeleted.value = id;
-};
+        if (status === 403) {
+            loadError.value = 'Não tens permissão para ver os bilhetes.';
+        } else if (status === 401) {
+            loadError.value = 'A sessão expirou. Inicia sessão novamente.';
+        } else {
+            loadError.value = 'Não foi possível carregar os bilhetes. Tenta novamente.';
+        }
 
-const confirmTransaction = (id) => {
-    axios
-        .get(`${baseURL}/admin-tickets/${id}`)
-        .then((response) => {
-            retriviedData.value = response.data.transaction;
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Message Detail', life: 3000 });
-        })
-        .catch((error) => {
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
-        })
-        .finally(() => {});
+        if (silent) {
+            toast.add({ severity: 'error', summary: 'Erro', detail: loadError.value, life: 4000 });
+        }
+    } finally {
+        isLoading.value = false;
+        isRefreshing.value = false;
+    }
 };
 
-// const downloadReport = () => {
-//     isLoadingButtonExport.value = true;
-//     axios
-//         .get(`${baseURL}/export/company`, { responseType: 'blob' })
-//         .then((response) => {
-//             const url = window.URL.createObjectURL(new Blob([response.data]));
-//             const link = document.createElement('a');
-//             link.href = url;
-//             link.setAttribute('download', 'company.xlsx');
-//             document.body.appendChild(link);
-//             link.click();
+const onPage = (event) => {
+    rowsPerPage.value = event.rows;
+    first.value = event.first;
+    const page = Math.floor(event.first / event.rows) + 1;
+    getData(page, { silent: true });
+};
 
-//             toast.add({ severity: 'success', detail: `Relatorio baixado com sucesso`, summary: 'Sucesso', life: 3000 });
-//             isLoadingButtonExport.value = false;
-//         })
-//         .catch((error) => {
-//             isLoadingButtonExport.value = false;
-//             toast.add({ severity: 'error', detail: `${error}`, summary: 'Erro', life: 3000 });
-//         });
-// };
+const debouncedSearch = debounce(() => getData(1, { silent: true }), 350);
+watch(searchQuery, () => debouncedSearch());
+watch(statusFilter, () => getData(1, { silent: true }));
+
+const hasActiveFilters = computed(() => !!searchQuery.value || statusFilter.value !== null);
+
+const clearFilters = () => {
+    searchQuery.value = '';
+    statusFilter.value = null;
+};
+
+const formatCurrency = (value) =>
+    `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)} MT`;
+
+const formatNumber = (value) => new Intl.NumberFormat('pt-PT').format(Number(value) || 0);
+
+const formatDateTime = (value) => (value ? moment(value).format('DD/MM/YYYY HH:mm') : '--');
+
+const ticketPrice = (row) => row.ticket?.price ?? row.sell?.price ?? 0;
+
+const hasRows = computed(() => !!retriviedData.value.data?.length);
 
 onMounted(() => {
     getData();
@@ -108,88 +102,205 @@ onMounted(() => {
 </script>
 
 <template>
-    <div className="card" v-if="!isLoadingDiv">
-        <div class="col-12">
-            <div class="card-w-title">
-                <h5>Eventos</h5>
-                <IconField iconPosition="left">
+    <div class="admin-tickets">
+        <div class="flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+            <div>
+                <h4 class="m-0 text-900">Bilhetes emitidos</h4>
+                <span class="text-600">Todos os bilhetes vendidos na plataforma e o respetivo estado de entrada</span>
+            </div>
+            <Button
+                icon="pi pi-refresh"
+                label="Atualizar"
+                outlined
+                :loading="isRefreshing"
+                @click="getData(currentPage, { silent: true })"
+            />
+        </div>
+
+        <div class="grid">
+            <div class="col-12 md:col-4">
+                <div class="card mb-0">
+                    <span class="block text-500 text-sm mb-2">Total emitidos</span>
+                    <span class="text-900 font-medium text-2xl">{{ formatNumber(summary.total) }}</span>
+                </div>
+            </div>
+            <div class="col-6 md:col-4">
+                <div class="card mb-0">
+                    <span class="block text-500 text-sm mb-2">Por usar</span>
+                    <span class="text-green-600 font-medium text-2xl">{{ formatNumber(summary.valid) }}</span>
+                </div>
+            </div>
+            <div class="col-6 md:col-4">
+                <div class="card mb-0">
+                    <span class="block text-500 text-sm mb-2">Já validados</span>
+                    <span class="text-900 font-medium text-2xl">{{ formatNumber(summary.used) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="filter-bar">
+                <IconField iconPosition="left" class="filter-bar__search">
                     <InputIcon class="pi pi-search" />
-                    <InputText type="text" placeholder="Procurar ..." v-model="searchQuery" />
+                    <InputText v-model="searchQuery" placeholder="Procurar por nº, evento, nome, email ou telemóvel..." class="w-full" />
                 </IconField>
+
+                <Dropdown
+                    v-model="statusFilter"
+                    :options="statusOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Todos os estados"
+                    showClear
+                    class="filter-bar__select"
+                />
+
+                <Button v-if="hasActiveFilters" label="Limpar" icon="pi pi-times" text @click="clearFilters" />
             </div>
 
-            <h5>Registro dos Tickets</h5>
+            <div v-if="isLoading" class="mt-4">
+                <Skeleton v-for="n in 6" :key="`row-${n}`" height="3.5rem" class="mb-2" />
+            </div>
 
-            <!-- <router-link to="/admin/eventos/create">
-                <Button label="Criar Novo Registro" class="mr-2 mb-2"> <i class="pi pi-plus"></i> Criar Novo Registro </Button>
-            </router-link> -->
-            <!-- <Button label="Baixar" class="mr-2 mb-2" @click="downloadReport()" :disabled="isLoadingButtonExport"> <i :class="!isLoadingButtonExport ? 'pi pi-arrow-down' : 'pi pi-spinner'"></i> Baixar Registro </Button> -->
+            <div v-else-if="loadError" class="empty-state">
+                <i class="pi pi-exclamation-triangle text-4xl text-orange-500 mb-3" />
+                <h5 class="text-900 mb-2">Não foi possível carregar</h5>
+                <p class="text-600 mb-4">{{ loadError }}</p>
+                <Button label="Tentar novamente" icon="pi pi-refresh" @click="getData()" />
+            </div>
 
-            <p>Esta tabela contem {{ retriviedData.data ? retriviedData.total : 0 }} Registros.</p>
+            <template v-else>
+                <p class="text-600 mt-3 mb-3">
+                    {{ formatNumber(retriviedData.total || 0) }}
+                    {{ (retriviedData.total || 0) === 1 ? 'bilhete encontrado' : 'bilhetes encontrados' }}
+                </p>
 
-            <DataTable :value="retriviedData.data" tableStyle="min-width: 50rem">
-                <template #header>
-                    <div class="flex flex-wrap align-items-center justify-content-between gap-2">
-                        <span class="text-xl text-900 font-bold">Eventos</span>
-                        <Button icon="pi pi-refresh" rounded raised @click="getData" />
-                    </div>
-                </template>
-                <Column field="name" header="#">
-                    <template #body="slotProps">
-                        {{ slotProps.index + 1 }}
-                    </template>
-                </Column>
+                <DataTable
+                    v-if="hasRows"
+                    :value="retriviedData.data"
+                    lazy
+                    paginator
+                    :rows="rowsPerPage"
+                    :first="first"
+                    :totalRecords="retriviedData.total || 0"
+                    :rowsPerPageOptions="[10, 20, 50]"
+                    paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
+                    currentPageReportTemplate="A mostrar {first} a {last} de {totalRecords} bilhetes"
+                    responsiveLayout="scroll"
+                    class="p-datatable-sm"
+                    tableStyle="min-width: 60rem"
+                    @page="onPage"
+                >
+                    <Column header="Nº">
+                        <template #body="slotProps">
+                            <span class="font-medium text-900">#{{ slotProps.data.id }}</span>
+                        </template>
+                    </Column>
 
-                <Column field="ID" sortable header="ID">
-                    <template #body="slotProps"> #{{ slotProps.data.id }} </template>
-                </Column>
-                <Column field="event.name" sortable header="Evento"></Column>
-                <Column field="ticket.name" sortable header="Bilhete"></Column>
-                <Column field="created_at" sortable header="Valor">
-                    <template #body="slotProps"> {{ slotProps.data.sell.price }} MT </template>
-                </Column>
+                    <Column header="Evento">
+                        <template #body="slotProps">
+                            <router-link
+                                v-if="slotProps.data.event"
+                                :to="`/admin/eventos/${slotProps.data.event.id}`"
+                                class="text-primary no-underline"
+                            >
+                                {{ slotProps.data.event.name }}
+                            </router-link>
+                            <span v-else class="text-500">Evento indisponível</span>
+                        </template>
+                    </Column>
 
-                <Column field="status" sortable header="Estado">
-                    <template #body="slotProps">
-                        <Tag severity="success" v-if="slotProps.data.status == 1">Não confirmada</Tag>
-                        <Tag severity="danger" v-if="slotProps.data.status == 0">Confirmada</Tag>
+                    <Column header="Bilhete">
+                        <template #body="slotProps">
+                            {{ slotProps.data.ticket?.name || '--' }}
+                        </template>
+                    </Column>
 
-                        <!-- <Dropdown v-model="device_availability_id" :options="deviceavailability" optionLabel="name" optionValue="id" placeholder="Selecionar" :class="{ 'p-invalid': errors.device_availability_id }" disabled /> -->
-                    </template>
-                </Column>
-                <Column field="sell.transaction.reference" sortable header="Transação"></Column>
-                <Column field="created_at" sortable header="Criado em">
-                    <template #body="slotProps">
-                        {{ moment(slotProps.data.created_at).format('DD-MM-YYYY H:mm') }}
-                    </template>
-                </Column>
-                <Column field="id" sortable header="Usuário">
-                    <template #body="slotProps"> {{ slotProps.data.name }} / {{ slotProps.data.email }} / {{ slotProps.data.mobile }} </template>
-                </Column>
-                <Column header="Ações">
-                    <template #body="slotProps">
-                        <router-link :to="'/admin/tickets/' + slotProps.data.id"><i class="pi pi-eye"></i></router-link>
-                    </template>
-                </Column>
-                <template #footer> No total são {{ retriviedData.data ? retriviedData.total : 0 }} Eventos. </template>
-            </DataTable>
-            <TailwindPagination :data="retriviedData" @pagination-change-page="getData" bg-whitebg-blue-50 style="width: 10px" />
+                    <Column header="Valor">
+                        <template #body="slotProps">
+                            {{ formatCurrency(ticketPrice(slotProps.data)) }}
+                        </template>
+                    </Column>
+
+                    <Column header="Comprador">
+                        <template #body="slotProps">
+                            <div class="flex flex-column">
+                                <span class="text-900">{{ slotProps.data.name || 'Sem nome' }}</span>
+                                <span class="text-500 text-sm">{{ slotProps.data.email || slotProps.data.mobile || '--' }}</span>
+                            </div>
+                        </template>
+                    </Column>
+
+                    <Column header="Estado">
+                        <template #body="slotProps">
+                            <Tag v-if="slotProps.data.status == 1" severity="success" value="Por usar" />
+                            <Tag v-else severity="secondary" value="Validado" />
+                        </template>
+                    </Column>
+
+                    <Column header="Transação">
+                        <template #body="slotProps">
+                            {{ slotProps.data.sell?.transaction?.reference || '--' }}
+                        </template>
+                    </Column>
+
+                    <Column header="Emitido em">
+                        <template #body="slotProps">
+                            {{ formatDateTime(slotProps.data.created_at) }}
+                        </template>
+                    </Column>
+
+                    <Column header="Ações" style="width: 6rem">
+                        <template #body="slotProps">
+                            <router-link :to="`/admin/tickets/${slotProps.data.id}`">
+                                <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver bilhete'" />
+                            </router-link>
+                        </template>
+                    </Column>
+                </DataTable>
+
+                <div v-else class="empty-state">
+                    <i class="pi pi-ticket text-4xl text-400 mb-3" />
+                    <h5 class="text-900 mb-2">Nenhum bilhete encontrado</h5>
+                    <p class="text-600 mb-4">
+                        {{ hasActiveFilters ? 'Nenhum bilhete corresponde aos filtros aplicados.' : 'Ainda não há bilhetes emitidos.' }}
+                    </p>
+                    <Button v-if="hasActiveFilters" label="Limpar filtros" icon="pi pi-times" outlined @click="clearFilters" />
+                </div>
+            </template>
         </div>
     </div>
-
-    <div class="text-center" v-else>
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
-        <p>Por Favor Aguarde...</p>
-    </div>
-
-    <Dialog header="Confirmação" v-model:visible="displayConfirmation" :style="{ width: '350px' }" :modal="true">
-        <div class="flex align-items-center justify-content-center">
-            <i class="pi pi-exclamation-triangle mr-3" style="font-size: 2rem" />
-            <span>Tem certeza que deseja proceder?</span>
-        </div>
-        <template #footer>
-            <Button label="Não" icon="pi pi-times" @click="closeConfirmation" class="p-button-text" />
-            <Button label="Sim" icon="pi pi-check" @click="deleteData" class="p-button-text" autofocus />
-        </template>
-    </Dialog>
 </template>
+
+<style scoped>
+.filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.filter-bar__search {
+    flex: 1 1 20rem;
+    min-width: 14rem;
+}
+
+.filter-bar__select {
+    min-width: 12rem;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 3rem 1rem;
+}
+
+@media (max-width: 767px) {
+    .filter-bar__select {
+        flex: 1 1 100%;
+    }
+}
+</style>
