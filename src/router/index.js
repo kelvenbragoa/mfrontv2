@@ -3,6 +3,13 @@ import AppLayout from '@/layout/AppLayout.vue';
 import AppPromotorLayout from '@/layoutpromotor/AppPromotorLayout.vue';
 import AppAdminLayout from '@/layoutadmin/AppAdminLayout.vue';
 import AppHomeLayout from '@/layouthome/AppHomeLayout.vue';
+import {
+    getCurrentPromotorSlug,
+    getPromotorPublicUrl,
+    shouldUseSubdomainUrls
+} from '@/utils/promotorHost';
+
+const tenantSlug = getCurrentPromotorSlug();
 
 const router = createRouter({
     history: createWebHistory(),
@@ -687,7 +694,10 @@ const router = createRouter({
                 {
                     path: '/',
                     name: 'homepage',
-                    component: () => import('@/views/pages/home/home.vue')
+                    meta: tenantSlug ? { promotorSlug: tenantSlug } : {},
+                    component: tenantSlug
+                        ? () => import('@/views/pages/home/promotor/showPromotor.vue')
+                        : () => import('@/views/pages/home/home.vue')
                 },
                 {
                     path: '/eventos',
@@ -800,6 +810,22 @@ const router = createRouter({
             component: () => import('@/views/pages/auth/Error.vue')
         }
     ]
+});
+
+router.beforeEach((to) => {
+    const hostSlug = getCurrentPromotorSlug();
+    if (!hostSlug) return true;
+
+    if (to.name === 'promotor.public') {
+        const pathSlug = to.params.slug;
+        if (pathSlug && pathSlug !== hostSlug && shouldUseSubdomainUrls()) {
+            window.location.href = getPromotorPublicUrl(pathSlug);
+            return false;
+        }
+        return { name: 'homepage', replace: true };
+    }
+
+    return true;
 });
 
 export default router;

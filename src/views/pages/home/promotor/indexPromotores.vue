@@ -4,8 +4,11 @@ import { baseURL, storageURL } from '@/service/ApiConstant';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import { debounce } from 'lodash';
+import { getPromotorPublicUrl } from '@/utils/promotorHost';
 
 const toast = useToast();
+const promotorHref = (slug) => getPromotorPublicUrl(slug);
+
 const isLoading = ref(true);
 const isLoadingList = ref(false);
 const searchQuery = ref('');
@@ -141,7 +144,7 @@ onMounted(() => getData());
 
             <div v-else-if="hasItems" class="grid">
                 <div v-for="item in list" :key="item.id" class="col-12 md:col-6 xl:col-4">
-                    <router-link :to="`/p/${item.slug}`" class="promotor-card">
+                    <a :href="promotorHref(item.slug)" class="promotor-card">
                         <div
                             class="promotor-card__banner"
                             :class="{ 'promotor-card__banner--default': isDefaultBanner(item) }"
@@ -175,7 +178,7 @@ onMounted(() => getData());
                                 </p>
                             </div>
                         </div>
-                    </router-link>
+                    </a>
                 </div>
             </div>
 

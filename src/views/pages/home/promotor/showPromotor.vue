@@ -6,9 +6,14 @@ import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { debounce } from 'lodash';
+import { getCurrentPromotorSlug } from '@/utils/promotorHost';
 
 const route = useRoute();
 const toast = useToast();
+
+const promotorSlug = computed(
+    () => route.params.slug || route.meta.promotorSlug || getCurrentPromotorSlug() || null
+);
 
 const isLoading = ref(true);
 const isLoadingEvents = ref(false);
@@ -84,7 +89,7 @@ const imageSrc = (event) => {
 };
 
 const getData = async (page = 1) => {
-    const slug = route.params.slug;
+    const slug = promotorSlug.value;
     if (!slug) {
         notFound.value = true;
         isLoading.value = false;
@@ -143,15 +148,12 @@ watch(searchQuery, () => {
     }
 });
 
-watch(
-    () => route.params.slug,
-    () => {
-        isLoading.value = true;
-        brokenImages.value = new Set();
-        searchQuery.value = '';
-        getData(1);
-    }
-);
+watch(promotorSlug, () => {
+    isLoading.value = true;
+    brokenImages.value = new Set();
+    searchQuery.value = '';
+    getData(1);
+});
 
 onMounted(() => getData(1));
 </script>

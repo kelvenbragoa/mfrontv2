@@ -1,13 +1,15 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { baseURL, storageURL } from '@/service/ApiConstant';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { debounce } from 'lodash';
+import { openPromotorPage } from '@/utils/promotorHost';
 
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
 
 const isLoadingDiv = ref(true);
@@ -233,7 +235,7 @@ onMounted(() => {
                                 <span
                                     v-if="event.user?.slug"
                                     class="promoter-inline-link"
-                                    @click.prevent.stop="$router.push(`/p/${event.user.slug}`)"
+                                    @click.prevent.stop="openPromotorPage(event.user.slug, router)"
                                 >{{ event.user?.company_name }}</span>
                                 <span v-else>{{ event.user?.company_name }}</span>
                                 <Tag :value="getValue(event.end_date)" :severity="getSeverity(event.end_date)" />

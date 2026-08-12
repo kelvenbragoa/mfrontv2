@@ -1,13 +1,16 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { baseURL, storageURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
+import { getPromotorPublicUrl, openPromotorPage, shouldUseSubdomainUrls } from '@/utils/promotorHost';
 
 const route = useRoute();
+const router = useRouter();
 const toast = useToast();
+const useSubdomainLinks = shouldUseSubdomainUrls();
 
 const isLoadingDiv = ref(true);
 const notFound = ref(false);
@@ -48,7 +51,8 @@ const promoterName = computed(() => {
 });
 
 const promoterSlug = computed(() => event.value?.user?.slug || null);
-const promoterPagePath = computed(() => (promoterSlug.value ? `/p/${promoterSlug.value}` : null));
+const promoterPageUrl = computed(() => getPromotorPublicUrl(promoterSlug.value));
+const goToPromoter = () => openPromotorPage(promoterSlug.value, router);
 
 const likesCount = computed(() => event.value?.like?.length || 0);
 const ticketsCount = computed(() => event.value?.tickets?.length || 0);
@@ -188,13 +192,21 @@ watch(() => route.params.id, getData);
                         <div class="detail-panel__stats">
                             <span><strong>{{ likesCount }}</strong> gostos</span>
                             <span><strong>{{ ticketsCount }}</strong> tipos de bilhete</span>
-                            <router-link
-                                v-if="promoterPagePath"
-                                :to="promoterPagePath"
+                            <a
+                                v-if="promoterPageUrl && useSubdomainLinks"
+                                :href="promoterPageUrl"
                                 class="promoter-link"
                             >
                                 {{ promoterName }}
-                            </router-link>
+                            </a>
+                            <a
+                                v-else-if="promoterPageUrl"
+                                href="#"
+                                class="promoter-link"
+                                @click.prevent="goToPromoter"
+                            >
+                                {{ promoterName }}
+                            </a>
                             <span v-else>{{ promoterName }}</span>
                         </div>
                     </div>
@@ -213,19 +225,35 @@ watch(() => route.params.id, getData);
 
                         <h3 class="detail-subtitle">Promotor</h3>
                         <p class="detail-text mb-1">
-                            <router-link
-                                v-if="promoterPagePath"
-                                :to="promoterPagePath"
+                            <a
+                                v-if="promoterPageUrl && useSubdomainLinks"
+                                :href="promoterPageUrl"
                                 class="promoter-link"
                             >
                                 {{ promoterName }}
-                            </router-link>
+                            </a>
+                            <a
+                                v-else-if="promoterPageUrl"
+                                href="#"
+                                class="promoter-link"
+                                @click.prevent="goToPromoter"
+                            >
+                                {{ promoterName }}
+                            </a>
                             <template v-else>{{ promoterName }}</template>
                         </p>
-                        <p v-if="promoterPagePath" class="mb-3">
-                            <router-link :to="promoterPagePath">
+                        <p v-if="promoterPageUrl" class="mb-3">
+                            <a v-if="useSubdomainLinks" :href="promoterPageUrl">
                                 <Button label="Ver página do promotor" icon="pi pi-external-link" text class="px-0" />
-                            </router-link>
+                            </a>
+                            <Button
+                                v-else
+                                label="Ver página do promotor"
+                                icon="pi pi-external-link"
+                                text
+                                class="px-0"
+                                @click="goToPromoter"
+                            />
                         </p>
                         <p v-if="event.user?.email || event.email" class="detail-text mb-1">
                             <i class="pi pi-envelope mr-2" />
@@ -332,7 +360,7 @@ watch(() => route.params.id, getData);
                                 <span
                                     v-if="item.user?.slug"
                                     class="promoter-link"
-                                    @click.prevent.stop="$router.push(`/p/${item.user.slug}`)"
+                                    @click.prevent.stop="openPromotorPage(item.user.slug, router)"
                                 >
                                     {{ item.user?.company_name || item.user?.name }}
                                 </span>

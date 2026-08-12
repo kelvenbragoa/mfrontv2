@@ -5,6 +5,12 @@ import axios from 'axios';
 import { useForm } from 'vee-validate';
 import * as yup from 'yup';
 import { useToast } from 'primevue/usetoast';
+import {
+    getPromotorPublicLabel,
+    getPromotorPublicUrl,
+    shouldUseSubdomainUrls,
+    RESERVED_SUBDOMAINS
+} from '@/utils/promotorHost';
 
 const toast = useToast();
 
@@ -29,6 +35,10 @@ const schema = yup.object({
         .nullable()
         .trim()
         .matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Usa apenas letras minúsculas, números e hífens.')
+        .test('reserved', 'Este slug está reservado. Escolhe outro.', (value) => {
+            if (!value) return true;
+            return !RESERVED_SUBDOMAINS.has(value);
+        })
         .label('Slug')
 });
 
@@ -41,10 +51,9 @@ const [company_location] = defineField('company_location');
 const [description] = defineField('description');
 const [slug] = defineField('slug');
 
-const publicUrl = computed(() => {
-    if (!slug.value) return null;
-    return `${window.location.origin}/p/${slug.value}`;
-});
+const publicUrl = computed(() => getPromotorPublicUrl(slug.value));
+const publicLabel = computed(() => getPromotorPublicLabel(slug.value));
+const useSubdomainLinks = shouldUseSubdomainUrls();
 
 const currentAvatarSrc = computed(() => {
     if (avatarPreview.value) return avatarPreview.value;
@@ -224,7 +233,10 @@ onMounted(() => loadProfile());
                     outlined
                     @click="copyPublicUrl"
                 />
-                <router-link v-if="slug" :to="`/p/${slug}`" target="_blank">
+                <a v-if="slug && useSubdomainLinks" :href="publicUrl" target="_blank" rel="noopener">
+                    <Button icon="pi pi-external-link" label="Ver página" outlined />
+                </a>
+                <router-link v-else-if="slug" :to="`/p/${slug}`" target="_blank">
                     <Button icon="pi pi-external-link" label="Ver página" outlined />
                 </router-link>
             </div>
@@ -299,11 +311,15 @@ onMounted(() => loadProfile());
 
                 <div class="col-12 field">
                     <label for="slug">Slug / link</label>
-                    <InputGroup>
+                    <InputGroup v-if="useSubdomainLinks">
+                        <InputText id="slug" v-model="slug" class="w-full" placeholder="nova-era" />
+                        <InputGroupAddon>.mticket.co.mz</InputGroupAddon>
+                    </InputGroup>
+                    <InputGroup v-else>
                         <InputGroupAddon>/p/</InputGroupAddon>
                         <InputText id="slug" v-model="slug" class="w-full" placeholder="nova-era" />
                     </InputGroup>
-                    <small class="text-600">Mais tarde isto será algo como nova-era.mticket.co.mz</small>
+                    <small v-if="publicLabel" class="text-600">Link público: {{ publicLabel }}</small>
                     <small v-if="errors.slug" class="p-error block">{{ errors.slug }}</small>
                 </div>
 
