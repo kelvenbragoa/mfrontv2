@@ -1,1 +1,0 @@
-import{I as o}from"./InvitesDashboard-d188ca05.js";import{a as r,g as a}from"./index-8d75f931.js";import"./ApiConstant-fad94e1c.js";import"./moment-a9aaa855.js";const _={__name:"IndexDashboardConvites",setup(t){return(e,s)=>(r(),a(o))}};export{_ as default};

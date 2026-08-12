@@ -1,0 +1,1 @@
+import{s as e,a as o,g as r}from"./index-909aeed0.js";import{L as s}from"./LineupsDashboard-0354b427.js";import"./ApiConstant-9a961d93.js";import"./moment-a9aaa855.js";const h={__name:"IndexDashboardLineups",setup(t){const a=`/admin/eventos/${e().currentRoute.value.params.id}/dashboard`;return(d,p)=>(o(),r(s,{"dashboard-path":a}))}};export{h as default};
