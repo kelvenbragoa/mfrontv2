@@ -10,41 +10,51 @@ import { debounce } from 'lodash';
 const route = useRoute();
 const toast = useToast();
 
-const isLoadingDiv = ref(true);
+const isLoading = ref(true);
 const isLoadingEvents = ref(false);
 const notFound = ref(false);
 const searchQuery = ref('');
-const selectedProvince = ref(null);
 const brokenImages = ref(new Set());
 const rowsPerPage = ref(12);
 const first = ref(0);
 
-const retriviedData = ref({
-    category: null,
-    provinces: [],
-    events: { data: [] }
+const promotor = ref(null);
+const events = ref({ data: [] });
+
+const eventsList = computed(() => events.value?.data || []);
+const hasEvents = computed(() => eventsList.value.length > 0);
+const showPagination = computed(() => (events.value?.last_page || 0) > 1);
+
+const displayName = computed(() => promotor.value?.company_name || promotor.value?.name || 'Promotor');
+
+const initials = computed(() => {
+    const name = displayName.value.trim();
+    if (!name) return 'P';
+    return name
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join('');
 });
 
-const category = computed(() => retriviedData.value.category);
-const eventsList = computed(() => retriviedData.value.events?.data || []);
-const hasEvents = computed(() => eventsList.value.length > 0);
-const hasActiveFilters = computed(() => !!(searchQuery.value?.trim() || selectedProvince.value));
-const showPagination = computed(() => (retriviedData.value.events?.last_page || 0) > 1);
+const DEFAULT_BANNER = '/demo/images/logo2.png';
 
-const categoryBackground = computed(() => {
-    if (!category.value?.image || brokenImages.value.has(`category-${category.value.id}`)) {
+const bannerSrc = computed(() => {
+    if (!promotor.value?.banner || brokenImages.value.has('banner')) {
+        return DEFAULT_BANNER;
+    }
+    return storageURL + promotor.value.banner;
+});
+
+const avatarSrc = computed(() => {
+    if (!promotor.value?.image || brokenImages.value.has('avatar')) {
         return null;
     }
-    return storageURL + category.value.image;
+    return storageURL + promotor.value.image;
 });
 
-const getValue = (eventdate) => {
-    return moment().isSameOrBefore(moment(eventdate)) ? 'À venda' : 'Encerrado';
-};
-
-const getSeverity = (eventdate) => {
-    return moment().isSameOrBefore(moment(eventdate)) ? 'success' : 'danger';
-};
+const getValue = (eventdate) => (moment().isSameOrBefore(moment(eventdate)) ? 'À venda' : 'Encerrado');
+const getSeverity = (eventdate) => (moment().isSameOrBefore(moment(eventdate)) ? 'success' : 'danger');
 
 const formatPrice = (event) => {
     const price = event.tickets_min_price;
@@ -74,7 +84,14 @@ const imageSrc = (event) => {
 };
 
 const getData = async (page = 1) => {
-    if (!isLoadingDiv.value) {
+    const slug = route.params.slug;
+    if (!slug) {
+        notFound.value = true;
+        isLoading.value = false;
+        return;
+    }
+
+    if (!isLoading.value) {
         isLoadingEvents.value = true;
     }
 
@@ -84,30 +101,27 @@ const getData = async (page = 1) => {
     if (searchQuery.value?.trim()) {
         params.search = searchQuery.value.trim();
     }
-    if (selectedProvince.value) {
-        params.province_id = selectedProvince.value;
-    }
 
     try {
-        const response = await axios.get(`${baseURL}/categories/${route.params.id}`, { params });
-        retriviedData.value = {
-            category: response.data.category || null,
-            provinces: response.data.provinces || [],
-            events: response.data.events || { data: [] }
-        };
+        const response = await axios.get(`${baseURL}/promotores/${slug}`, { params });
+        promotor.value = response.data.promotor;
+        events.value = response.data.events || { data: [] };
+        notFound.value = false;
     } catch (error) {
         if (error?.response?.status === 404) {
             notFound.value = true;
+            promotor.value = null;
+            events.value = { data: [] };
         } else {
             toast.add({
                 severity: 'error',
-                summary: 'Não foi possível carregar a categoria',
+                summary: 'Não foi possível carregar a página',
                 detail: 'Tenta novamente dentro de momentos.',
                 life: 4000
             });
         }
     } finally {
-        isLoadingDiv.value = false;
+        isLoading.value = false;
         isLoadingEvents.value = false;
     }
 };
@@ -123,38 +137,37 @@ const debouncedSearch = debounce(() => {
     getData(1);
 }, 400);
 
-watch([searchQuery, selectedProvince], () => {
-    if (!isLoadingDiv.value) {
+watch(searchQuery, () => {
+    if (!isLoading.value && !notFound.value) {
         debouncedSearch();
     }
 });
 
 watch(
-    () => route.params.id,
+    () => route.params.slug,
     () => {
+        isLoading.value = true;
+        brokenImages.value = new Set();
         searchQuery.value = '';
-        selectedProvince.value = null;
-        notFound.value = false;
-        isLoadingDiv.value = true;
         getData(1);
     }
 );
 
-const clearFilters = () => {
-    searchQuery.value = '';
-    selectedProvince.value = null;
-};
-
-onMounted(() => {
-    getData();
-});
+onMounted(() => getData(1));
 </script>
 
 <template>
-    <div v-if="isLoadingDiv" class="category-page px-4 lg:px-8 mx-0 lg:mx-8 py-4">
-        <Skeleton height="10rem" class="mb-5 border-round-xl" />
+    <div v-if="isLoading" class="promotor-page px-4 lg:px-8 mx-0 lg:mx-8 py-4">
+        <Skeleton height="14rem" class="mb-4 border-round-xl" />
+        <div class="flex align-items-end gap-3 mb-5" style="margin-top: -3rem">
+            <Skeleton shape="circle" size="6rem" />
+            <div class="flex-1">
+                <Skeleton width="40%" height="1.75rem" class="mb-2" />
+                <Skeleton width="60%" height="1rem" />
+            </div>
+        </div>
         <div class="grid">
-            <div v-for="n in 6" :key="'card-' + n" class="col-12 md:col-6 xl:col-4">
+            <div v-for="n in 6" :key="'skel-' + n" class="col-12 md:col-6 xl:col-4">
                 <Skeleton height="18rem" class="border-round-xl mb-3" />
                 <Skeleton width="60%" height="1.25rem" class="mb-2" />
                 <Skeleton width="40%" height="1rem" />
@@ -162,51 +175,66 @@ onMounted(() => {
         </div>
     </div>
 
-    <div v-else-if="notFound" class="category-page px-4 lg:px-8 mx-0 lg:mx-8 py-6">
+    <div v-else-if="notFound" class="promotor-page px-4 lg:px-8 mx-0 lg:mx-8 py-6">
         <div class="empty-block">
-            <h2 class="text-900 mt-0 mb-2">Categoria não encontrada</h2>
-            <p class="text-600 mb-3">Esta categoria pode ter sido removida ou o link está incorreto.</p>
+            <i class="pi pi-user text-4xl text-blue-500 mb-3" />
+            <h3 class="text-900 mt-0 mb-2">Promotor não encontrado</h3>
+            <p class="text-600 mb-3">Este link não corresponde a nenhuma página de promotor.</p>
             <router-link to="/eventos">
                 <Button label="Ver todos os eventos" class="p-button-rounded border-none font-medium text-white bg-blue-500" />
             </router-link>
         </div>
     </div>
 
-    <div v-else class="category-page">
-        <section class="category-hero" :style="categoryBackground ? { '--hero-image': `url('${categoryBackground}')` } : null">
-            <div class="category-hero__veil" />
-            <div class="category-hero__content px-4 lg:px-8 mx-0 lg:mx-8">
-                <router-link to="/eventos" class="category-hero__back">
-                    <i class="pi pi-arrow-left mr-2" />
-                    Eventos
-                </router-link>
-                <p class="category-hero__eyebrow">Categoria</p>
-                <h1 class="category-hero__title">{{ category?.name || 'Eventos' }}</h1>
-                <p class="category-hero__subtitle">Explora os eventos desta categoria em todo o país.</p>
+    <div v-else class="promotor-page">
+        <section class="promotor-hero">
+            <div
+                class="promotor-hero__banner"
+                :class="{ 'promotor-hero__banner--default': !promotor?.banner || brokenImages.has('banner') }"
+                :style="{ backgroundImage: `url(${bannerSrc})` }"
+            >
+                <img
+                    :src="bannerSrc"
+                    alt=""
+                    class="promotor-hero__banner-img"
+                    @error="promotor?.banner && markBrokenImage('banner')"
+                />
+            </div>
+
+            <div class="promotor-hero__content px-4 lg:px-8 mx-0 lg:mx-8">
+                <div class="promotor-identity">
+                    <div class="promotor-avatar">
+                        <img
+                            v-if="avatarSrc"
+                            :src="avatarSrc"
+                            :alt="displayName"
+                            @error="markBrokenImage('avatar')"
+                        />
+                        <span v-else>{{ initials }}</span>
+                    </div>
+                    <div class="promotor-identity__text">
+                        <p class="promotor-eyebrow">Promotor</p>
+                        <h1 class="promotor-title">{{ displayName }}</h1>
+                        <p v-if="promotor?.company_location" class="promotor-location">
+                            <i class="pi pi-map-marker mr-1" />
+                            {{ promotor.company_location }}
+                        </p>
+                        <p v-if="promotor?.description" class="promotor-bio">{{ promotor.description }}</p>
+                    </div>
+                </div>
             </div>
         </section>
 
         <section class="py-4 px-4 lg:px-8 mt-2 mx-0 lg:mx-8">
             <div class="flex flex-column lg:flex-row lg:align-items-end lg:justify-content-between gap-3 mb-4">
                 <div>
-                    <h2 class="text-900 font-normal mb-2">Em destaque</h2>
-                    <span class="text-600 text-xl">Filtra por nome ou província</span>
+                    <h2 class="text-900 font-normal mb-2">Eventos</h2>
+                    <span class="text-600 text-xl">Navega e compra bilhetes deste promotor</span>
                 </div>
-                <div class="category-filters">
-                    <IconField iconPosition="left" class="w-full md:w-18rem">
-                        <InputIcon class="pi pi-search" />
-                        <InputText v-model="searchQuery" placeholder="Pesquisar eventos..." class="w-full" />
-                    </IconField>
-                    <Dropdown
-                        v-model="selectedProvince"
-                        :options="retriviedData.provinces"
-                        optionLabel="name"
-                        optionValue="id"
-                        placeholder="Província"
-                        showClear
-                        class="w-full md:w-14rem"
-                    />
-                </div>
+                <IconField iconPosition="left" class="w-full md:w-18rem">
+                    <InputIcon class="pi pi-search" />
+                    <InputText v-model="searchQuery" placeholder="Pesquisar eventos..." class="w-full" />
+                </IconField>
             </div>
 
             <div v-if="isLoadingEvents" class="grid">
@@ -230,12 +258,7 @@ onMounted(() => {
                         </div>
                         <div class="event-card__body">
                             <div class="event-card__meta">
-                                <span
-                                    v-if="event.user?.slug"
-                                    class="promoter-inline-link"
-                                    @click.prevent.stop="$router.push(`/p/${event.user.slug}`)"
-                                >{{ event.user?.company_name }}</span>
-                                <span v-else>{{ event.user?.company_name }}</span>
+                                <span>{{ event.type?.name || 'Evento' }}</span>
                                 <Tag :value="getValue(event.end_date)" :severity="getSeverity(event.end_date)" />
                             </div>
                             <h3 class="event-card__title">{{ event.name }}</h3>
@@ -248,10 +271,7 @@ onMounted(() => {
                                     <div class="event-card__date">{{ moment(event.start_date).format('LL') }}</div>
                                     <div class="event-card__price">{{ formatPrice(event) }}</div>
                                 </div>
-                                <div class="flex align-items-center gap-2">
-                                    <Tag v-if="event.type?.name" :value="event.type.name" severity="info" />
-                                    <Button icon="pi pi-eye" severity="secondary" outlined aria-label="Ver evento" />
-                                </div>
+                                <Button icon="pi pi-eye" severity="secondary" outlined aria-label="Ver evento" />
                             </div>
                         </div>
                     </router-link>
@@ -259,30 +279,17 @@ onMounted(() => {
             </div>
 
             <div v-else class="empty-block">
-                <h3 class="text-900 mt-0 mb-2">Nenhum evento encontrado</h3>
-                <p class="text-600 mb-3">
-                    {{
-                        hasActiveFilters
-                            ? 'Ajusta a pesquisa ou limpa os filtros para ver mais resultados.'
-                            : 'Ainda não há eventos publicados nesta categoria.'
-                    }}
+                <h3 class="text-900 mt-0 mb-2">Sem eventos publicados</h3>
+                <p class="text-600 mb-0">
+                    {{ searchQuery ? 'Nenhum evento corresponde à pesquisa.' : 'Este promotor ainda não tem eventos à venda.' }}
                 </p>
-                <Button
-                    v-if="hasActiveFilters"
-                    label="Limpar filtros"
-                    class="p-button-rounded border-none font-medium text-white bg-blue-500"
-                    @click="clearFilters"
-                />
-                <router-link v-else to="/eventos">
-                    <Button label="Ver todos os eventos" class="p-button-rounded border-none font-medium text-white bg-blue-500" />
-                </router-link>
             </div>
 
             <div v-if="showPagination && !isLoadingEvents" class="pagination-wrap mt-5">
                 <Paginator
                     :rows="rowsPerPage"
                     :first="first"
-                    :totalRecords="retriviedData.events.total || 0"
+                    :totalRecords="events.total || 0"
                     :rowsPerPageOptions="[9, 12, 24]"
                     template="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
                     currentPageReportTemplate="A mostrar {first} a {last} de {totalRecords} eventos"
@@ -294,71 +301,108 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.category-hero {
+.promotor-hero {
     position: relative;
+}
+
+.promotor-hero__banner {
+    position: relative;
+    height: clamp(10rem, 28vw, 16rem);
     overflow: hidden;
-    background-color: #0b3d91;
-    background-image: var(--hero-image, linear-gradient(135deg, #0b3d91 0%, #1e6fe3 55%, #4f9cf8 100%));
+    background: #000;
     background-size: cover;
     background-position: center;
-    animation: hero-fade 0.6s ease-out;
 }
 
-.category-hero__veil {
+.promotor-hero__banner--default {
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-color: #000;
+}
+
+.promotor-hero__banner-img {
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(8, 28, 68, 0.4) 0%, rgba(8, 28, 68, 0.82) 100%);
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0;
+    pointer-events: none;
 }
 
-.category-hero__content {
+.promotor-hero__banner--default .promotor-hero__banner-img {
+    object-fit: contain;
+}
+
+.promotor-hero__content {
     position: relative;
-    z-index: 1;
-    padding-top: 2.75rem;
-    padding-bottom: 2.5rem;
+    margin-top: -3.5rem;
+    padding-bottom: 1.5rem;
 }
 
-.category-hero__back {
-    display: inline-flex;
-    align-items: center;
-    color: rgba(255, 255, 255, 0.92);
-    text-decoration: none;
-    font-weight: 600;
-    margin-bottom: 0.85rem;
-}
-
-.category-hero__eyebrow {
-    margin: 0 0 0.5rem;
-    color: rgba(255, 255, 255, 0.85);
-    font-size: 0.95rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    animation: rise-in 0.6s ease-out both;
-}
-
-.category-hero__title {
-    margin: 0 0 0.6rem;
-    color: #fff;
-    font-size: clamp(1.75rem, 4vw, 2.75rem);
-    font-weight: 700;
-    line-height: 1.15;
-    animation: rise-in 0.65s ease-out 0.06s both;
-}
-
-.category-hero__subtitle {
-    margin: 0;
-    color: rgba(255, 255, 255, 0.88);
-    font-size: 1.1rem;
-    max-width: 36rem;
-    animation: rise-in 0.65s ease-out 0.12s both;
-}
-
-.category-filters {
+.promotor-identity {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    align-items: flex-end;
+    gap: 1.25rem;
+}
+
+.promotor-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 7rem;
+    height: 7rem;
+    border-radius: 999px;
+    overflow: hidden;
+    border: 4px solid #fff;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.75rem;
+    box-shadow: 0 10px 30px rgba(15, 40, 80, 0.18);
+    flex-shrink: 0;
+}
+
+.promotor-avatar img {
     width: 100%;
-    max-width: 34rem;
+    height: 100%;
+    object-fit: cover;
+}
+
+.promotor-identity__text {
+    flex: 1;
+    min-width: 12rem;
+    padding-bottom: 0.35rem;
+}
+
+.promotor-eyebrow {
+    margin: 0 0 0.25rem;
+    color: #64748b;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.promotor-title {
+    margin: 0 0 0.35rem;
+    color: #0f172a;
+    font-size: clamp(1.6rem, 3.5vw, 2.35rem);
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.promotor-location {
+    margin: 0 0 0.65rem;
+    color: #475569;
+}
+
+.promotor-bio {
+    margin: 0;
+    max-width: 42rem;
+    color: #334155;
+    line-height: 1.55;
 }
 
 .event-card {
@@ -409,16 +453,6 @@ onMounted(() => {
     font-size: 0.95rem;
 }
 
-.promoter-inline-link {
-    color: #2563eb;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.promoter-inline-link:hover {
-    text-decoration: underline;
-}
-
 .event-card__title {
     margin: 0 0 0.5rem;
     font-size: 1.25rem;
@@ -456,26 +490,6 @@ onMounted(() => {
     padding: 2.5rem 1.5rem;
     text-align: center;
     background: var(--surface-50, #f8fafc);
-}
-
-@keyframes hero-fade {
-    from {
-        opacity: 0.65;
-    }
-    to {
-        opacity: 1;
-    }
-}
-
-@keyframes rise-in {
-    from {
-        opacity: 0;
-        transform: translateY(12px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .pagination-wrap {

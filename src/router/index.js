@@ -700,6 +700,16 @@ const router = createRouter({
                     component: () => import('@/views/pages/home/events/showEvent.vue')
                 },
                 {
+                    path: '/promotores',
+                    name: 'promotores.index',
+                    component: () => import('@/views/pages/home/promotor/indexPromotores.vue')
+                },
+                {
+                    path: '/p/:slug',
+                    name: 'promotor.public',
+                    component: () => import('@/views/pages/home/promotor/showPromotor.vue')
+                },
+                {
                     path: '/categorias/:id',
                     name: 'categorias',
                     component: () => import('@/views/pages/home/categories/showCategory.vue')

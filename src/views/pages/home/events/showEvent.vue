@@ -47,6 +47,9 @@ const promoterName = computed(() => {
     return event.value?.user?.company_name || event.value?.user?.name || 'Promotor';
 });
 
+const promoterSlug = computed(() => event.value?.user?.slug || null);
+const promoterPagePath = computed(() => (promoterSlug.value ? `/p/${promoterSlug.value}` : null));
+
 const likesCount = computed(() => event.value?.like?.length || 0);
 const ticketsCount = computed(() => event.value?.tickets?.length || 0);
 const hasLineups = computed(() => (event.value?.lineups || []).length > 0);
@@ -185,7 +188,14 @@ watch(() => route.params.id, getData);
                         <div class="detail-panel__stats">
                             <span><strong>{{ likesCount }}</strong> gostos</span>
                             <span><strong>{{ ticketsCount }}</strong> tipos de bilhete</span>
-                            <span>{{ promoterName }}</span>
+                            <router-link
+                                v-if="promoterPagePath"
+                                :to="promoterPagePath"
+                                class="promoter-link"
+                            >
+                                {{ promoterName }}
+                            </router-link>
+                            <span v-else>{{ promoterName }}</span>
                         </div>
                     </div>
 
@@ -202,7 +212,21 @@ watch(() => route.params.id, getData);
                         </p>
 
                         <h3 class="detail-subtitle">Promotor</h3>
-                        <p class="detail-text mb-1">{{ promoterName }}</p>
+                        <p class="detail-text mb-1">
+                            <router-link
+                                v-if="promoterPagePath"
+                                :to="promoterPagePath"
+                                class="promoter-link"
+                            >
+                                {{ promoterName }}
+                            </router-link>
+                            <template v-else>{{ promoterName }}</template>
+                        </p>
+                        <p v-if="promoterPagePath" class="mb-3">
+                            <router-link :to="promoterPagePath">
+                                <Button label="Ver página do promotor" icon="pi pi-external-link" text class="px-0" />
+                            </router-link>
+                        </p>
                         <p v-if="event.user?.email || event.email" class="detail-text mb-1">
                             <i class="pi pi-envelope mr-2" />
                             {{ event.email || event.user?.email }}
@@ -305,7 +329,14 @@ watch(() => route.params.id, getData);
                         </div>
                         <div class="event-card__body">
                             <div class="event-card__meta">
-                                <span>{{ item.user?.company_name || item.user?.name }}</span>
+                                <span
+                                    v-if="item.user?.slug"
+                                    class="promoter-link"
+                                    @click.prevent.stop="$router.push(`/p/${item.user.slug}`)"
+                                >
+                                    {{ item.user?.company_name || item.user?.name }}
+                                </span>
+                                <span v-else>{{ item.user?.company_name || item.user?.name }}</span>
                                 <Tag :value="getValue(item.end_date)" :severity="getSeverity(item.end_date)" />
                             </div>
                             <h3 class="event-card__title">{{ item.name }}</h3>
@@ -426,6 +457,17 @@ watch(() => route.params.id, getData);
     color: #475569;
     line-height: 1.6;
     white-space: pre-wrap;
+}
+
+.promoter-link {
+    color: #2563eb;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.promoter-link:hover {
+    text-decoration: underline;
 }
 
 .ticket-list,

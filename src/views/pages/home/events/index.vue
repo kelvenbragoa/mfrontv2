@@ -202,7 +202,12 @@ onMounted(() => {
                         </div>
                         <div class="event-card__body">
                             <div class="event-card__meta">
-                                <span>{{ event.user?.company_name }}</span>
+                                <span
+                                    v-if="event.user?.slug"
+                                    class="promoter-inline-link"
+                                    @click.prevent.stop="$router.push(`/p/${event.user.slug}`)"
+                                >{{ event.user?.company_name }}</span>
+                                <span v-else>{{ event.user?.company_name }}</span>
                                 <Tag :value="getValue(event.end_date)" :severity="getSeverity(event.end_date)" />
                             </div>
                             <h3 class="event-card__title">{{ event.name }}</h3>
@@ -350,6 +355,16 @@ onMounted(() => {
     margin-bottom: 0.5rem;
     color: #64748b;
     font-size: 0.95rem;
+}
+
+.promoter-inline-link {
+    color: #2563eb;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.promoter-inline-link:hover {
+    text-decoration: underline;
 }
 
 .event-card__title {

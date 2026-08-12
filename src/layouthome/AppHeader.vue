@@ -41,6 +41,11 @@ onMounted(() => {
                     </router-link>
                 </li>
                 <li>
+                    <router-link to="/promotores" class="flex m-0 md:ml-5 px-0 py-3 text-900 font-medium line-height-3 p-ripple" v-ripple>
+                        <span>Promotores</span>
+                    </router-link>
+                </li>
+                <li>
                     <router-link to="/ser-promotor" class="flex m-0 md:ml-5 px-0 py-3 text-900 font-medium line-height-3 p-ripple" v-ripple>
                         <span>Seja um promotor</span>
                     </router-link>
