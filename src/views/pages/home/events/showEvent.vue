@@ -1,11 +1,12 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
+import { useHead } from '@vueuse/head';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { baseURL, storageURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
-import { getPromotorPublicUrl, openPromotorPage, shouldUseSubdomainUrls, getCurrentPromotorSlug, getEventPublicUrl, getMainSiteUrl } from '@/utils/promotorHost';
+import { getPromotorPublicUrl, openPromotorPage, shouldUseSubdomainUrls, getCurrentPromotorSlug, getEventPublicUrl, getMainSiteUrl, getMainSiteOrigin } from '@/utils/promotorHost';
 
 const route = useRoute();
 const router = useRouter();
@@ -103,6 +104,43 @@ const getSeverity = (eventdate) => {
 };
 
 const formatTicketPrice = (price) => `${Number(price || 0).toLocaleString('pt-MZ')} MT`;
+
+const metaTitle = computed(() => (event.value?.name ? `${event.value.name} | Mticket` : 'Mticket'));
+
+const metaDescription = computed(() => {
+    if (!event.value) return 'Compra bilhetes para os melhores eventos em Moçambique na Mticket.';
+
+    const raw = (event.value.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (raw) return raw.length > 200 ? `${raw.slice(0, 197)}...` : raw;
+
+    const when = event.value.start_date ? moment(event.value.start_date).format('DD/MM/YYYY [às] HH:mm') : '';
+    return [when, locationLabel.value].filter(Boolean).join(' • ') || 'Compra o teu bilhete na Mticket.';
+});
+
+const metaImage = computed(() => {
+    if (event.value?.image) return storageURL + event.value.image;
+    return `${getMainSiteOrigin()}/demo/images/logo2.png`;
+});
+
+const metaUrl = computed(() => (typeof window === 'undefined' ? '' : window.location.href.split('?')[0]));
+
+useHead({
+    title: metaTitle,
+    meta: computed(() => [
+        { name: 'description', content: metaDescription.value },
+        { property: 'og:site_name', content: 'Mticket' },
+        { property: 'og:type', content: 'website' },
+        { property: 'og:title', content: metaTitle.value },
+        { property: 'og:description', content: metaDescription.value },
+        { property: 'og:image', content: metaImage.value },
+        { property: 'og:url', content: metaUrl.value },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: metaTitle.value },
+        { name: 'twitter:description', content: metaDescription.value },
+        { name: 'twitter:image', content: metaImage.value }
+    ]),
+    link: computed(() => (metaUrl.value ? [{ rel: 'canonical', href: metaUrl.value }] : []))
+});
 
 const getData = async () => {
     isLoadingDiv.value = true;

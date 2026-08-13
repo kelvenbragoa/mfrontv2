@@ -1,4 +1,5 @@
 import { createApp } from 'vue';
+import { createHead } from '@vueuse/head';
 import App from './App.vue';
 import router from './router';
 import axios from 'axios';
@@ -112,6 +113,7 @@ import '@/assets/styles.scss';
 
 const app = createApp(App);
 
+app.use(createHead());
 app.use(router);
 app.use(PrimeVue, { ripple: true });
 app.use(ToastService);
