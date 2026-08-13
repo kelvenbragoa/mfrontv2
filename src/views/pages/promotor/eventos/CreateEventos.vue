@@ -29,6 +29,20 @@ const schema = yup.object({
     second_category_id: yup.mixed().nullable().label('Categoria secundária'),
     type_event_id: yup.mixed().required().label('Tipo de evento'),
     address: yup.string().required().trim().label('Endereço'),
+    latitude: yup
+        .number()
+        .transform((value, originalValue) => (originalValue === '' || originalValue === null ? null : value))
+        .nullable()
+        .min(-90)
+        .max(90)
+        .label('Latitude'),
+    longitude: yup
+        .number()
+        .transform((value, originalValue) => (originalValue === '' || originalValue === null ? null : value))
+        .nullable()
+        .min(-180)
+        .max(180)
+        .label('Longitude'),
     start_date: yup.string().required().label('Data de início'),
     start_time: yup.string().required().label('Hora de início'),
     end_date: yup.string().required().label('Data de fim'),
@@ -50,7 +64,9 @@ const { defineField, handleSubmit, errors, setErrors, setFieldValue } = useForm(
         facebook: '',
         twitter: '',
         youtube: '',
-        second_category_id: null
+        second_category_id: null,
+        latitude: null,
+        longitude: null
     }
 });
 
@@ -62,6 +78,8 @@ const [main_category_id] = defineField('main_category_id');
 const [second_category_id] = defineField('second_category_id');
 const [type_event_id] = defineField('type_event_id');
 const [address] = defineField('address');
+const [latitude] = defineField('latitude');
+const [longitude] = defineField('longitude');
 const [start_date] = defineField('start_date');
 const [start_time] = defineField('start_time');
 const [end_date] = defineField('end_date');
@@ -310,6 +328,40 @@ onMounted(() => {
                     <InputText id="address" v-model="address" :class="{ 'p-invalid': errors.address }" placeholder="Morada ou local do evento" />
                     <small class="p-error">{{ errors.address }}</small>
                 </div>
+
+                <div class="formgrid grid">
+                    <div class="field col-12 md:col-6">
+                        <label for="latitude">Latitude (mapa)</label>
+                        <InputNumber
+                            id="latitude"
+                            v-model="latitude"
+                            :minFractionDigits="0"
+                            :maxFractionDigits="7"
+                            :useGrouping="false"
+                            placeholder="-19.8187"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.latitude }"
+                        />
+                        <small class="p-error">{{ errors.latitude }}</small>
+                    </div>
+                    <div class="field col-12 md:col-6">
+                        <label for="longitude">Longitude (mapa)</label>
+                        <InputNumber
+                            id="longitude"
+                            v-model="longitude"
+                            :minFractionDigits="0"
+                            :maxFractionDigits="7"
+                            :useGrouping="false"
+                            placeholder="34.8553"
+                            class="w-full"
+                            :class="{ 'p-invalid': errors.longitude }"
+                        />
+                        <small class="p-error">{{ errors.longitude }}</small>
+                    </div>
+                </div>
+                <small class="text-600 block mb-3">
+                    Opcional. No Google Maps, clica com o botão direito no local e copia as coordenadas (ex.: Beira ≈ -19.82, 34.85).
+                </small>
 
                 <div class="formgrid grid">
                     <div class="field col-12 md:col-6">

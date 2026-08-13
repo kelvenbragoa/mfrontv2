@@ -137,8 +137,12 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
 
         const ticketName = row.ticket?.name || '';
         const customer = row.user_id == 0 ? 'mticket venda fisica' : `${row.name || ''} ${row.mobile || ''} ${row.email || ''}`;
+        const details = row.selldetails || row.sell_details || [];
+        const answersText = details
+            .flatMap((detail) => Object.values(detail.form_answers || {}))
+            .join(' ');
 
-        return [ticketName, customer, String(row.qty || ''), String(row.total || '')].some((part) =>
+        return [ticketName, customer, String(row.qty || ''), String(row.total || ''), answersText].some((part) =>
             String(part).toLowerCase().includes(query)
         );
     };

@@ -35,6 +35,8 @@ const schema = yup.object({
     second_category_id: yup.string().required().label('CategoriaSec'),
     type_event_id: yup.string().required().label('Province'),
     address: yup.string().required().label('Province'),
+    latitude: yup.string().nullable().label('Latitude'),
+    longitude: yup.string().nullable().label('Longitude'),
     start_date: yup.string().required().label('Province'),
     start_time: yup.string().required().label('Province'),
     end_date: yup.string().required().label('Province'),
@@ -61,6 +63,8 @@ const [main_category_id] = defineField('main_category_id');
 const [second_category_id] = defineField('second_category_id');
 const [type_event_id] = defineField('type_event_id');
 const [address] = defineField('address');
+const [latitude] = defineField('latitude');
+const [longitude] = defineField('longitude');
 const [start_date] = defineField('start_date');
 const [start_time] = defineField('start_time');
 const [end_date] = defineField('end_date');
@@ -132,6 +136,8 @@ const getData = () => {
             second_category_id.value = retriviedData.value.second_category_id;
             type_event_id.value = retriviedData.value.type_event_id;
             address.value = retriviedData.value.address;
+            latitude.value = retriviedData.value.latitude ?? '';
+            longitude.value = retriviedData.value.longitude ?? '';
             start_date.value = retriviedData.value.start_date;
             start_time.value = retriviedData.value.start_time;
             end_date.value = retriviedData.value.end_date;
@@ -217,6 +223,18 @@ onMounted(() => {
                             <label for="address">Endereço</label>
                             <InputText v-model="address" id="address" type="text" :class="{ 'p-invalid': errors.address }" />
                             <small id="address-help" class="p-error">{{ errors.address }}</small>
+                        </div>
+                        <div class="formgrid grid">
+                            <div class="field col">
+                                <label for="latitude">Latitude (mapa)</label>
+                                <InputText v-model="latitude" id="latitude" type="text" placeholder="-19.8187" :class="{ 'p-invalid': errors.latitude }" />
+                                <small class="p-error">{{ errors.latitude }}</small>
+                            </div>
+                            <div class="field col">
+                                <label for="longitude">Longitude (mapa)</label>
+                                <InputText v-model="longitude" id="longitude" type="text" placeholder="34.8553" :class="{ 'p-invalid': errors.longitude }" />
+                                <small class="p-error">{{ errors.longitude }}</small>
+                            </div>
                         </div>
                         <div class="formgrid grid">
                             <div class="field col">

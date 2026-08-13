@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { usePromotorTicketSalesDashboard } from '@/composables/usePromotorTicketSalesDashboard';
 
@@ -46,6 +46,52 @@ const {
     issuedLabel: props.issuedLabel,
     dashboardPath: props.dashboardPath || undefined
 });
+
+const detailVisible = ref(false);
+const selectedSale = ref(null);
+
+const openSaleDetail = (sale) => {
+    selectedSale.value = sale;
+    detailVisible.value = true;
+};
+
+const closeSaleDetail = () => {
+    detailVisible.value = false;
+    selectedSale.value = null;
+};
+
+const saleDetails = computed(() => selectedSale.value?.selldetails || selectedSale.value?.sell_details || []);
+
+const fieldLabelMap = computed(() => {
+    const fields = selectedSale.value?.ticket?.form_fields || selectedSale.value?.ticket?.formFields || [];
+    const map = {};
+    fields.forEach((field) => {
+        map[field.field_key] = field.label || field.field_key;
+    });
+    return map;
+});
+
+const hasAnyAnswers = (sale) => {
+    const details = sale?.selldetails || sale?.sell_details || [];
+    return details.some((detail) => detail.form_answers && Object.keys(detail.form_answers).length > 0);
+};
+
+const formatAnswerValue = (value) => {
+    if (value === true || value === 1 || value === '1') return 'Sim';
+    if (value === false || value === 0 || value === '0') return 'Não';
+    if (value === null || value === undefined || value === '') return '—';
+    return String(value);
+};
+
+const answerEntries = (detail) => {
+    const answers = detail?.form_answers;
+    if (!answers || typeof answers !== 'object') return [];
+    return Object.entries(answers).map(([key, value]) => ({
+        key,
+        label: fieldLabelMap.value[key] || key,
+        value: formatAnswerValue(value)
+    }));
+};
 
 onMounted(() => getData());
 </script>
@@ -185,12 +231,65 @@ onMounted(() => getData());
                     <Column header="Data" sortable>
                         <template #body="slotProps">{{ formatDateTime(slotProps.data.created_at) }}</template>
                     </Column>
+                    <Column header="Formulário" style="width: 8rem">
+                        <template #body="slotProps">
+                            <Button
+                                v-if="hasAnyAnswers(slotProps.data)"
+                                label="Ver"
+                                icon="pi pi-eye"
+                                size="small"
+                                text
+                                @click="openSaleDetail(slotProps.data)"
+                            />
+                            <span v-else class="text-500 text-sm">—</span>
+                        </template>
+                    </Column>
                 </DataTable>
                 <p v-else class="tab-empty">
                     {{ hasActiveFilters ? 'Nenhuma venda corresponde aos filtros.' : 'Ainda não há vendas registadas.' }}
                 </p>
             </div>
         </template>
+
+        <Dialog
+            v-model:visible="detailVisible"
+            modal
+            header="Respostas do formulário"
+            :style="{ width: 'min(640px, 95vw)' }"
+            @hide="closeSaleDetail"
+        >
+            <div v-if="selectedSale" class="sale-detail">
+                <div class="sale-detail__meta mb-3">
+                    <p class="mb-1"><strong>Bilhete:</strong> {{ selectedSale.ticket?.name || '—' }}</p>
+                    <p class="mb-1"><strong>Cliente:</strong> {{ customerLabel(selectedSale) }}</p>
+                    <p class="mb-1"><strong>Email:</strong> {{ selectedSale.email || '—' }}</p>
+                    <p class="mb-1"><strong>Telemóvel:</strong> {{ selectedSale.mobile || '—' }}</p>
+                    <p class="mb-0"><strong>Data:</strong> {{ formatDateTime(selectedSale.created_at) }}</p>
+                </div>
+
+                <div v-if="saleDetails.length" class="participant-list">
+                    <div
+                        v-for="(detail, index) in saleDetails"
+                        :key="detail.id || index"
+                        class="participant-block"
+                    >
+                        <h6 class="mt-0 mb-2">Participante {{ index + 1 }}</h6>
+                        <div v-if="answerEntries(detail).length" class="answer-grid">
+                            <div v-for="entry in answerEntries(detail)" :key="entry.key" class="answer-row">
+                                <span class="answer-label">{{ entry.label }}</span>
+                                <strong class="answer-value">{{ entry.value }}</strong>
+                            </div>
+                        </div>
+                        <p v-else class="text-500 m-0 text-sm">Sem respostas para este bilhete.</p>
+                    </div>
+                </div>
+                <p v-else class="text-500 m-0">Não há detalhes de bilhetes nesta venda.</p>
+            </div>
+
+            <template #footer>
+                <Button label="Fechar" @click="closeSaleDetail" />
+            </template>
+        </Dialog>
     </div>
 </template>
 
@@ -254,6 +353,47 @@ onMounted(() => getData());
     display: flex;
     flex-direction: column;
     align-items: center;
+}
+
+.sale-detail__meta {
+    background: var(--surface-50, #f8fafc);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+}
+
+.participant-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.participant-block {
+    border: 1px solid var(--surface-border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+}
+
+.answer-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.answer-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.95rem;
+}
+
+.answer-label {
+    color: #64748b;
+}
+
+.answer-value {
+    text-align: right;
+    color: #0f172a;
+    white-space: pre-wrap;
 }
 
 @media (max-width: 767px) {

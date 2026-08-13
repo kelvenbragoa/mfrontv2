@@ -31,6 +31,13 @@ const schema = yup.object({
     price: yup.string().required().trim().label('Preco'),
     description: yup.string().required().trim().label('Descricao'),
     max_qtd: yup.string().required().label('Quantidade'),
+    max_per_order: yup
+        .number()
+        .transform((value, originalValue) => (originalValue === '' || originalValue === null || originalValue === undefined ? null : value))
+        .nullable()
+        .min(1)
+        .integer()
+        .label('Máx. por compra'),
     event_id: yup.string().required().label('Evento'),
     start_date: yup.string().required().label('Data'),
     start_time: yup.string().required().label('Horas'),
@@ -57,6 +64,7 @@ const [name] = defineField('name');
 const [event_id] = defineField('event_id');
 const [description] = defineField('description');
 const [max_qtd] = defineField('max_qtd');
+const [max_per_order] = defineField('max_per_order');
 const [start_date] = defineField('start_date');
 const [start_time] = defineField('start_time');
 const [end_date] = defineField('end_date');
@@ -105,6 +113,7 @@ const getData = () => {
             start_date.value = retriviedData.value.start_date;
             end_date.value = retriviedData.value.end_date;
             max_qtd.value = retriviedData.value.max_qtd;
+            max_per_order.value = retriviedData.value.max_per_order ?? '';
             price.value = retriviedData.value.price;
             description.value = retriviedData.value.description;
 
@@ -156,6 +165,19 @@ onMounted(() => {
                             <InputText v-model="max_qtd" id="max_qtd" type="number" :class="{ 'p-invalid': errors.max_qtd }" />
                             <InputText v-model="event_id" id="event_id" type="hidden" :class="{ 'p-invalid': errors.event_id }" />
                             <small id="max_qtd-help" class="p-error">{{ errors.max_qtd }}</small>
+                        </div>
+                        <div class="field">
+                            <label for="max_per_order">Máx. bilhetes por compra (opcional)</label>
+                            <InputText
+                                v-model="max_per_order"
+                                id="max_per_order"
+                                type="number"
+                                min="1"
+                                placeholder="Ex: 1 (só um de cada vez)"
+                                :class="{ 'p-invalid': errors.max_per_order }"
+                            />
+                            <small class="text-600">Limita a quantidade no checkout web. Vazio = até 5. Não afecta o check-in.</small>
+                            <small id="max_per_order-help" class="p-error block">{{ errors.max_per_order }}</small>
                         </div>
                         <div class="formgrid grid">
                             <div class="field col">

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import { baseURL, storageURL } from '@/service/ApiConstant';
@@ -19,6 +19,7 @@ const event = ref(null);
 const tickets = ref([]);
 const brokenImage = ref(false);
 const currentUser = ref(null);
+const formErrors = ref({});
 
 const schema = yup.object({
     customerName: yup.string().required().trim().label('Nome'),
@@ -72,6 +73,15 @@ const selectedTickets = computed(() => {
     return (tickets.value || []).filter((ticket) => Number(ticket.quantity) > 0);
 });
 
+const ticketFormFields = (ticket) => {
+    const fields = ticket?.form_fields || ticket?.formFields || [];
+    return Array.isArray(fields) ? fields : [];
+};
+
+const ticketsNeedingForms = computed(() =>
+    selectedTickets.value.filter((ticket) => ticketFormFields(ticket).length > 0)
+);
+
 const formatMoney = (value) => `${Number(value || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} MT`;
 
 const ticketWindow = (item) => {
@@ -84,6 +94,88 @@ const isTicketUnavailable = (item) => {
     const start = moment(`${item.start_date} ${item.start_time}`);
     const end = moment(`${item.end_date} ${item.end_time}`);
     return moment().isAfter(end) || Number(item.max_qtd) <= 0 || moment().isBefore(start);
+};
+
+/** Limite de quantidade no checkout web (frontend only). Default 5 se não configurado. */
+const ticketOrderMax = (item) => {
+    const n = Number(item?.max_per_order);
+    return Number.isFinite(n) && n > 0 ? n : 5;
+};
+
+const blankAnswersFor = (ticket) => {
+    const blank = {};
+    ticketFormFields(ticket).forEach((field) => {
+        blank[field.field_key] = field.type === 'checkbox' || field.type === 'terms' ? false : '';
+    });
+    return blank;
+};
+
+const ensureTicketAnswers = (ticket) => {
+    const qty = Number(ticket.quantity) || 0;
+    if (!Array.isArray(ticket.answers)) {
+        ticket.answers = [];
+    }
+    while (ticket.answers.length < qty) {
+        ticket.answers.push(blankAnswersFor(ticket));
+    }
+    if (ticket.answers.length > qty) {
+        ticket.answers.splice(qty);
+    }
+};
+
+watch(
+    tickets,
+    (list) => {
+        (list || []).forEach((ticket) => ensureTicketAnswers(ticket));
+    },
+    { deep: true }
+);
+
+const fieldErrorKey = (ticketId, unitIndex, fieldKey) => `${ticketId}:${unitIndex}:${fieldKey}`;
+
+const isAnswerMissing = (field, value) => {
+    if (field.type === 'terms' || field.type === 'checkbox') {
+        return !value;
+    }
+    return value === null || value === undefined || String(value).trim() === '';
+};
+
+const validateFormAnswers = () => {
+    const nextErrors = {};
+    let firstMessage = null;
+
+    for (const ticket of selectedTickets.value) {
+        const fields = ticketFormFields(ticket);
+        if (!fields.length) continue;
+
+        ensureTicketAnswers(ticket);
+
+        for (let i = 0; i < Number(ticket.quantity); i++) {
+            const unit = ticket.answers[i] || {};
+            for (const field of fields) {
+                if (!field.required) continue;
+                if (isAnswerMissing(field, unit[field.field_key])) {
+                    const key = fieldErrorKey(ticket.id, i, field.field_key);
+                    nextErrors[key] = 'Obrigatório';
+                    if (!firstMessage) {
+                        firstMessage = `Preenche "${field.label}" em ${ticket.name} (participante ${i + 1}).`;
+                    }
+                }
+            }
+        }
+    }
+
+    formErrors.value = nextErrors;
+    if (firstMessage) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Formulário incompleto',
+            detail: firstMessage,
+            life: 4000
+        });
+        return false;
+    }
+    return true;
 };
 
 const onSubmit = handleSubmit(async (values) => {
@@ -112,11 +204,18 @@ const onSubmit = handleSubmit(async (values) => {
         return;
     }
 
+    if (!validateFormAnswers()) {
+        return;
+    }
+
     isLoadingButton.value = true;
 
     const payload = {
         ...values,
-        tickets: tickets.value,
+        tickets: tickets.value.map((ticket) => ({
+            ...ticket,
+            answers: Number(ticket.quantity) > 0 ? ticket.answers || [] : []
+        })),
         amount: totalPrice.value
     };
 
@@ -135,7 +234,10 @@ const onSubmit = handleSubmit(async (values) => {
         });
         router.push({ path: '/encomenda' });
     } catch (error) {
-        const message = error?.response?.data?.message || 'Não foi possível concluir o pagamento.';
+        const message =
+            error?.response?.data?.message ||
+            (typeof error?.response?.data === 'string' ? error.response.data : null) ||
+            'Não foi possível concluir o pagamento.';
         toast.add({
             severity: 'error',
             summary: 'Erro no checkout',
@@ -157,7 +259,11 @@ const getData = async () => {
     try {
         const response = await axios.get(`${baseURL}/checkout/${route.params.id}`);
         event.value = response.data.events;
-        tickets.value = response.data.tickets || [];
+        tickets.value = (response.data.tickets || []).map((ticket) => ({
+            ...ticket,
+            quantity: Number(ticket.quantity) || 0,
+            answers: []
+        }));
     } catch (error) {
         if (error?.response?.status === 404) {
             notFound.value = true;
@@ -235,7 +341,7 @@ onMounted(() => {
                 <div class="col-12 lg:col-8">
                     <div class="detail-panel">
                         <h2 class="detail-title">Escolhe os bilhetes</h2>
-                        <p class="detail-text">Define a quantidade de cada tipo. Máximo 5 por tipo.</p>
+                        <p class="detail-text">Define a quantidade de cada tipo. O máximo por compra depende do bilhete.</p>
 
                         <div v-if="tickets.length" class="ticket-list">
                             <div v-for="item in tickets" :key="item.id" class="ticket-card" :class="{ 'ticket-card--disabled': isTicketUnavailable(item) || isEventClosed }">
@@ -259,7 +365,7 @@ onMounted(() => {
                                             showButtons
                                             buttonLayout="horizontal"
                                             :min="0"
-                                            :max="5"
+                                            :max="ticketOrderMax(item)"
                                             :disabled="isLoadingButton"
                                         >
                                             <template #incrementbuttonicon>
@@ -269,6 +375,7 @@ onMounted(() => {
                                                 <span class="pi pi-minus" />
                                             </template>
                                         </InputNumber>
+                                        <small class="text-600 block mt-2">Máx. {{ ticketOrderMax(item) }} por compra</small>
                                     </div>
                                 </div>
                             </div>
@@ -276,6 +383,113 @@ onMounted(() => {
 
                         <div v-else class="empty-block mt-3">
                             <p class="text-600 m-0">Ainda não há bilhetes disponíveis para este evento.</p>
+                        </div>
+                    </div>
+
+                    <div v-if="ticketsNeedingForms.length" class="detail-panel mt-4">
+                        <h2 class="detail-title">Dados dos participantes</h2>
+                        <p class="detail-text">
+                            Preenche o formulário de cada bilhete. Se comprares mais do que um, completa um bloco por pessoa.
+                        </p>
+
+                        <div v-for="ticket in ticketsNeedingForms" :key="'form-' + ticket.id" class="participant-ticket mb-4">
+                            <h3 class="detail-subtitle mb-3">{{ ticket.name }}</h3>
+
+                            <div
+                                v-for="(unit, unitIndex) in ticket.answers"
+                                :key="'unit-' + ticket.id + '-' + unitIndex"
+                                class="participant-card mb-3"
+                            >
+                                <div class="participant-card__title">
+                                    Participante {{ unitIndex + 1 }}
+                                    <span v-if="Number(ticket.quantity) > 1" class="text-600 font-normal">
+                                        de {{ ticket.quantity }}
+                                    </span>
+                                </div>
+
+                                <div
+                                    v-for="field in ticketFormFields(ticket)"
+                                    :key="field.id"
+                                    class="field"
+                                >
+                                    <label v-if="field.type !== 'terms' && field.type !== 'checkbox'">
+                                        {{ field.label }}
+                                        <span v-if="field.required" class="required">*</span>
+                                    </label>
+
+                                    <InputText
+                                        v-if="field.type === 'text'"
+                                        v-model="unit[field.field_key]"
+                                        class="w-full"
+                                        :class="{ 'p-invalid': formErrors[fieldErrorKey(ticket.id, unitIndex, field.field_key)] }"
+                                        :disabled="isLoadingButton"
+                                    />
+
+                                    <Textarea
+                                        v-else-if="field.type === 'textarea'"
+                                        v-model="unit[field.field_key]"
+                                        rows="3"
+                                        class="w-full"
+                                        :class="{ 'p-invalid': formErrors[fieldErrorKey(ticket.id, unitIndex, field.field_key)] }"
+                                        :disabled="isLoadingButton"
+                                    />
+
+                                    <InputNumber
+                                        v-else-if="field.type === 'number'"
+                                        v-model="unit[field.field_key]"
+                                        class="w-full"
+                                        :useGrouping="false"
+                                        :class="{ 'p-invalid': formErrors[fieldErrorKey(ticket.id, unitIndex, field.field_key)] }"
+                                        :disabled="isLoadingButton"
+                                    />
+
+                                    <Dropdown
+                                        v-else-if="field.type === 'select'"
+                                        v-model="unit[field.field_key]"
+                                        :options="field.options || []"
+                                        placeholder="Selecionar"
+                                        class="w-full"
+                                        :class="{ 'p-invalid': formErrors[fieldErrorKey(ticket.id, unitIndex, field.field_key)] }"
+                                        :disabled="isLoadingButton"
+                                    />
+
+                                    <div v-else-if="field.type === 'checkbox'" class="field-checkbox">
+                                        <Checkbox
+                                            v-model="unit[field.field_key]"
+                                            :binary="true"
+                                            :inputId="`cb-${ticket.id}-${unitIndex}-${field.field_key}`"
+                                            :disabled="isLoadingButton"
+                                        />
+                                        <label :for="`cb-${ticket.id}-${unitIndex}-${field.field_key}`">
+                                            {{ field.label }}
+                                            <span v-if="field.required" class="required">*</span>
+                                        </label>
+                                    </div>
+
+                                    <div v-else-if="field.type === 'terms'" class="terms-box">
+                                        <div class="terms-box__text">{{ field.terms_text }}</div>
+                                        <div class="field-checkbox mt-2">
+                                            <Checkbox
+                                                v-model="unit[field.field_key]"
+                                                :binary="true"
+                                                :inputId="`tm-${ticket.id}-${unitIndex}-${field.field_key}`"
+                                                :disabled="isLoadingButton"
+                                            />
+                                            <label :for="`tm-${ticket.id}-${unitIndex}-${field.field_key}`">
+                                                {{ field.label || 'Li e aceito os termos' }}
+                                                <span class="required">*</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <small
+                                        v-if="formErrors[fieldErrorKey(ticket.id, unitIndex, field.field_key)]"
+                                        class="p-error"
+                                    >
+                                        {{ formErrors[fieldErrorKey(ticket.id, unitIndex, field.field_key)] }}
+                                    </small>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -521,6 +735,47 @@ onMounted(() => {
 
 .ticket-card__actions {
     margin-top: 0.85rem;
+}
+
+.participant-card {
+    border: 1px solid var(--surface-border);
+    border-radius: 0.85rem;
+    padding: 1rem;
+    background: #fff;
+}
+
+.participant-card__title {
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.85rem;
+}
+
+.field-checkbox {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+}
+
+.field-checkbox label {
+    margin: 0;
+    font-weight: 600;
+    color: #334155;
+}
+
+.terms-box__text {
+    white-space: pre-wrap;
+    background: #f8fafc;
+    border: 1px solid var(--surface-border);
+    border-radius: 0.65rem;
+    padding: 0.75rem;
+    color: #475569;
+    font-size: 0.92rem;
+    max-height: 10rem;
+    overflow: auto;
+}
+
+.required {
+    color: #e24c4c;
 }
 
 .summary-lines {
