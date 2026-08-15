@@ -171,7 +171,7 @@ onBeforeMount(() => {
                             <Checkbox v-model="rememberMe" inputId="rememberMe" binary class="mr-2" :disabled="submitted" />
                             <label for="rememberMe" class="auth-row__label">Lembrar-me</label>
                         </div>
-                        <router-link to="/register" class="auth-link">Precisas de ajuda?</router-link>
+                        <router-link to="/auth/forgot-password" class="auth-link">Esqueceste a palavra-passe?</router-link>
                     </div>
 
                     <Button
