@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { baseURL, storageURL } from '@/service/ApiConstant';
 import axios from 'axios';
@@ -232,6 +232,7 @@ const loadForm = async () => {
         }
     } finally {
         isLoading.value = false;
+        await nextTick();
         skipProvinceWatch.value = false;
     }
 };
