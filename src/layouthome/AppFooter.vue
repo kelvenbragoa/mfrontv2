@@ -29,8 +29,8 @@ const smoothScroll = (id) => {
                     <h4 class="font-bold text-blue-500 text-3xl text-900">MTICKET</h4>
                 </a>
                 <p>Descubra coisas incríveis para fazer onde quer que vá.</p>
-                <img :src="'/demo/images/google-play.png'" height="30" width="120" class="border-round hover:scale-110 transition duration-500 cursor-pointer object-cover m-1" />
-                <img :src="'/demo/images/app-store.png'" height="30" width="120" class="border-round hover:scale-110 transition duration-500 cursor-pointer object-cover m-1" />
+                <a target="_blank" href="https://play.google.com/store/apps/details?id=mz.co.mticket.client"><img :src="'/demo/images/google-play.png'" height="30" width="120" class="border-round hover:scale-110 transition duration-500 cursor-pointer object-cover m-1" /></a>
+                <a target="_blank" href="https://apps.apple.com/mz/app/mticket/id6801146792"><img :src="'/demo/images/app-store.png'" height="30" width="120" class="border-round hover:scale-110 transition duration-500 cursor-pointer object-cover m-1" /></a>
             </div>
 
             <div class="col-12 md:col-10 lg:col-7">
