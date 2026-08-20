@@ -142,7 +142,7 @@ onMounted(() => {
             <div class="filter-bar">
                 <IconField iconPosition="left" class="filter-bar__search">
                     <InputIcon class="pi pi-search" />
-                    <InputText v-model="searchQuery" placeholder="Procurar por nº, evento, nome, email ou telemóvel..." class="w-full" />
+                    <InputText v-model="searchQuery" placeholder="Procurar por nº do bilhete, evento, nome, email ou telemóvel..." class="w-full" />
                 </IconField>
 
                 <Dropdown
@@ -193,7 +193,7 @@ onMounted(() => {
                 >
                     <Column header="Nº">
                         <template #body="slotProps">
-                            <span class="font-medium text-900">#{{ slotProps.data.id }}</span>
+                            <span class="font-medium text-900">{{ slotProps.data.ticket_number || `#${slotProps.data.id}` }}</span>
                         </template>
                     </Column>
 

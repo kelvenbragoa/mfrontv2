@@ -15,6 +15,7 @@ const model = ref([
             { label: 'Utilizadores', icon: 'pi pi-fw pi-users', to: '/admin/utilizadores' },
             { label: 'Transações', icon: 'pi pi-fw pi-chart-bar', to: '/admin/transacoes' },
             { label: 'Tickets', icon: 'pi pi-fw pi-ticket', to: '/admin/tickets' },
+            { label: 'Aplicações', icon: 'pi pi-fw pi-mobile', to: '/admin/aplicacoes' },
 
             // { label: 'Form Layout', icon: 'pi pi-fw pi-id-card', to: '/uikit/formlayout' },
             // { label: 'Input', icon: 'pi pi-fw pi-check-square', to: '/uikit/input' },

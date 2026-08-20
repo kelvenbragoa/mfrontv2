@@ -63,9 +63,11 @@ const statusTag = computed(() =>
     isValid.value ? { label: 'Por usar', severity: 'success' } : { label: 'Validado à entrada', severity: 'secondary' }
 );
 
+const ticketNumber = computed(() => data.value?.ticket_number || (data.value ? `#0${data.value.id}` : ''));
+
 const qrValue = computed(() => {
     if (!data.value) return '';
-    return JSON.stringify({ s: data.value.status, i: data.value.id, ie: data.value.event_id });
+    return data.value.qrcode || JSON.stringify({ s: data.value.status, i: data.value.id, ie: data.value.event_id });
 });
 
 const eventImage = computed(() => (event.value?.image ? `${storageURL}${event.value.image}` : '/demo/images/mticket.jpg'));
@@ -112,12 +114,16 @@ onMounted(() => {
                     <Tag :severity="statusTag.severity" :value="statusTag.label" />
                 </div>
 
-                <h4 class="mt-0 mb-1 text-900">Bilhete #{{ data.id }}</h4>
+                <h4 class="mt-0 mb-1 text-900">{{ data.ticket_number || `Bilhete #${data.id}` }}</h4>
                 <p class="text-600 mt-0 mb-4">
                     Emitido a {{ formatDateTime(data.created_at) }}
                 </p>
 
                 <div class="detail-grid">
+                    <div>
+                        <span class="detail-label">Nº do bilhete</span>
+                        <span class="detail-value">{{ ticketNumber }}</span>
+                    </div>
                     <div>
                         <span class="detail-label">Evento</span>
                         <router-link v-if="event" :to="`/admin/eventos/${event.id}`" class="detail-value text-primary no-underline">
@@ -185,7 +191,7 @@ onMounted(() => {
                                     <span>Mticket</span>
                                 </p>
                                 <div class="ticket-number">
-                                    <p>#0{{ data.id }}</p>
+                                    <p>{{ ticketNumber }}</p>
                                 </div>
                             </div>
                             <div class="ticket-info">
@@ -232,7 +238,7 @@ onMounted(() => {
                                 <div class="barcode">
                                     <qrcode-vue :value="qrValue" :size="100" level="H" render-as="svg" />
                                 </div>
-                                <p class="ticket-number">#0{{ data.id }}</p>
+                                <p class="ticket-number">{{ ticketNumber }}</p>
                             </div>
                         </div>
                     </div>

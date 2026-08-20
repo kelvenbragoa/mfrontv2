@@ -41,6 +41,8 @@ const smoothScroll = (id) => {
                         <router-link v-else to="/sobre-nos" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Sobre nós</router-link>
                         <a v-if="onPromotorSubdomain" :href="mainHref('/faq')" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Perguntas Frequentes</a>
                         <router-link v-else to="/faq" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Perguntas Frequentes</router-link>
+                        <a v-if="onPromotorSubdomain" :href="mainHref('/apps')" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Apps da equipa</a>
+                        <router-link v-else to="/apps" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Apps da equipa</router-link>
                     </div>
                     <div class="col-12 md:col-3 mt-4 md:mt-0">
                         <a v-if="onPromotorSubdomain" :href="mainHref('/privacy')" class="line-height-3 text-xl block cursor-pointer mb-2 text-700">Aspectos Legais</a>

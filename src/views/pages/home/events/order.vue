@@ -34,11 +34,15 @@ const locationLabel = computed(() => {
 
 const formatMoney = (value) => `${Number(value || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} MT`;
 
-const qrValue = (detail) => JSON.stringify({
-    s: detail.status,
-    i: detail.id,
-    ie: detail.event_id
-});
+const ticketNumber = (detail) => detail?.ticket_number || `#0${detail?.id ?? ''}`;
+
+const qrValue = (detail) =>
+    detail?.qrcode ||
+    JSON.stringify({
+        s: detail.status,
+        i: detail.id,
+        ie: detail.event_id
+    });
 
 const { paperize } = usePaperizer('myticket', {
     styles: [`${styleURL}/ticket.css?v=20260808`],
@@ -203,7 +207,7 @@ onMounted(() => {
                                                 <span>Mticket</span>
                                             </p>
                                             <div class="ticket-number">
-                                                <p>#0{{ detail.id }}</p>
+                                                <p>{{ ticketNumber(detail) }}</p>
                                             </div>
                                         </div>
                                         <div class="ticket-info">
@@ -250,7 +254,7 @@ onMounted(() => {
                                             <div class="barcode">
                                                 <qrcode-vue :value="qrValue(detail)" :size="100" level="H" render-as="svg" />
                                             </div>
-                                            <p class="ticket-number">#0{{ detail.id }}</p>
+                                            <p class="ticket-number">{{ ticketNumber(detail) }}</p>
                                         </div>
                                     </div>
                                 </div>

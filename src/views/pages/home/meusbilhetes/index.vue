@@ -67,7 +67,10 @@ const imageSrc = (event) => {
     return storageURL + event.image;
 };
 
+const ticketNumber = (ticket) => ticket?.ticket_number || `#0${ticket?.id ?? ''}`;
+
 const qrValue = (ticket) =>
+    ticket?.qrcode ||
     JSON.stringify({
         s: ticket.status,
         i: ticket.id,
@@ -215,7 +218,7 @@ onMounted(() => {
                     <div class="tickets-filters">
                         <IconField iconPosition="left" class="w-full md:w-18rem">
                             <InputIcon class="pi pi-search" />
-                            <InputText v-model="searchQuery" placeholder="Pesquisar evento..." class="w-full" />
+                            <InputText v-model="searchQuery" placeholder="Pesquisar evento ou nº do bilhete..." class="w-full" />
                         </IconField>
                         <Dropdown
                             v-model="selectedStatus"
@@ -246,7 +249,7 @@ onMounted(() => {
                             />
                             <div class="ticket-card__body">
                                 <div class="ticket-card__meta">
-                                    <span>#0{{ ticket.id }}</span>
+                                    <span>{{ ticketNumber(ticket) }}</span>
                                     <Tag :value="resolveStatus(ticket).label" :severity="resolveStatus(ticket).severity" />
                                 </div>
                                 <h3 class="ticket-card__title">{{ ticket.event?.name || 'Evento' }}</h3>
@@ -334,7 +337,7 @@ onMounted(() => {
             <div class="qr-dialog__code">
                 <qrcode-vue :value="qrValue(selectedTicket)" :size="180" level="H" render-as="svg" />
             </div>
-            <p class="qr-dialog__id">Bilhete #0{{ selectedTicket.id }}</p>
+            <p class="qr-dialog__id">{{ ticketNumber(selectedTicket) }}</p>
             <p class="qr-dialog__type">{{ selectedTicket.ticket?.name }}</p>
             <p class="qr-dialog__meta">
                 <span v-if="selectedTicket.event?.start_date">

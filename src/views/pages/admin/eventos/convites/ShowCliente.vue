@@ -18,6 +18,11 @@ const loadingprint = ref(false);
 const isLoadingButton = ref(false);
 const retriviedData = ref();
 const toast = useToast();
+
+const inviteNumber = (invite) => invite?.invite_number || `#0${invite?.id ?? ''}`;
+const inviteQrValue = (invite) =>
+    invite?.qrcode ||
+    JSON.stringify({ s: invite.status, c: invite.id, ie: invite.event_id });
 const provinces = ref([]);
 const cities = ref([]);
 const typeevent = ref([]);
@@ -133,7 +138,7 @@ onMounted(() => {
 
             <p>Convite</p>
 
-            <p><strong>ID: </strong>#{{ retriviedData.id }}</p>
+            <p><strong>Nº: </strong>{{ inviteNumber(retriviedData) }}</p>
             <p><strong>Evento: </strong>{{ retriviedData.event.name }}</p>
             <p><strong>Bilhete: </strong>{{ retriviedData.invite.name }}</p>
             <p><strong>Nome: </strong>{{ retriviedData.name }}</p>
@@ -148,7 +153,7 @@ onMounted(() => {
                             <span>Mticket</span>
                         </p>
                         <div class="ticket-number">
-                            <p>#0{{ retriviedData.id }}</p>
+                            <p>{{ inviteNumber(retriviedData) }}</p>
                         </div>
                     </div>
                     <div class="ticket-info">
@@ -188,9 +193,9 @@ onMounted(() => {
                             <p>{{ moment(retriviedData.event.start_time, 'HH:mm:ss').format('HH:mm') }} até {{ moment(retriviedData.event.end_time, 'HH:mm:ss').format('HH:mm') }}</p>
                         </div>
                         <div class="barcode">
-                            <qrcode-vue :value="`{&quot;s&quot;:${retriviedData.status},&quot;c&quot;:${retriviedData.id},&quot;ie&quot;:${retriviedData.event_id}}`" :size="100" level="H" render-as="svg" />
+                            <qrcode-vue :value="inviteQrValue(retriviedData)" :size="100" level="H" render-as="svg" />
                         </div>
-                        <p class="ticket-number">#0{{ retriviedData.id }}</p>
+                        <p class="ticket-number">{{ inviteNumber(retriviedData) }}</p>
                     </div>
                 </div>
             </div>

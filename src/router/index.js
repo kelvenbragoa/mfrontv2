@@ -56,6 +56,14 @@ const router = createRouter({
                     component: () => import('@/views/pages/admin/tickets/ShowTickets.vue')
                 },
                 {
+                    path: '/admin/aplicacoes',
+                    name: 'admin.aplicacoes',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/apps/IndexAplicacoes.vue')
+                },
+                {
                     path: '/admin/utilizadores',
                     name: 'admin.utilizadores',
                     meta: {
@@ -847,6 +855,11 @@ const router = createRouter({
                     path: '/faq',
                     name: 'faq',
                     component: () => import('@/views/pages/home/faq/index.vue')
+                },
+                {
+                    path: '/apps',
+                    name: 'apps',
+                    component: () => import('@/views/pages/home/apps/index.vue')
                 },
                 {
                     path: '/privacy',

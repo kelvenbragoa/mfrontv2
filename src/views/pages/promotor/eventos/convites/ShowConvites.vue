@@ -230,6 +230,11 @@ onMounted(() => {
                     </template>
                 </Column>
 
+                <Column field="invite_number" header="Nº">
+                    <template #body="slotProps">
+                        {{ slotProps.data.invite_number || `#${slotProps.data.id}` }}
+                    </template>
+                </Column>
                 <Column field="name" sortable header="Nome"></Column>
                 <Column field="status" header="Estado">
                     <template #body="slotProps">
