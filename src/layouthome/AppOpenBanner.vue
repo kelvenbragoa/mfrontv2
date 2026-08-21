@@ -104,7 +104,7 @@ onBeforeUnmount(() => {
                 <i class="pi pi-times" />
             </button>
 
-            <img class="app-banner__icon" src="/demo/images/logo.svg" alt="" width="40" height="40" />
+            <img class="app-banner__icon" src="/demo/images/logo2.png" alt="" width="40" height="40" />
 
             <div class="app-banner__copy">
                 <strong>Mticket</strong>
