@@ -1,29 +1,22 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref } from 'vue';
+import {
+    ANDROID_PACKAGE,
+    APP_STORE_URL,
+    PLAY_STORE_URL,
+    isAndroidDevice,
+    isMobileDevice,
+    isSafariIOS,
+    storeUrlForDevice
+} from '@/utils/appStores';
 
 const STORAGE_KEY = 'mticket_app_banner_dismissed';
-const ANDROID_PACKAGE = 'mz.co.mticket.client';
-const PLAY_STORE_URL = `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`;
-const APP_STORE_URL = 'https://apps.apple.com/mz/app/mticket/id6801146792';
 
 const visible = ref(false);
 const opening = ref(false);
 
 let fallbackTimer = null;
 let cancelOpen = false;
-
-const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-const isIOS = () => /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-const isAndroid = () => /Android/i.test(navigator.userAgent);
-
-const isSafariIOS = () => {
-    const ua = navigator.userAgent;
-    if (!isIOS()) return false;
-    const otherBrowser = /CriOS|FxiOS|EdgiOS|OPiOS|DuckDuckGo|YaBrowser/i.test(ua);
-    return /WebKit/i.test(ua) && !otherBrowser;
-};
 
 const wasDismissed = () => {
     try {
@@ -42,8 +35,6 @@ const dismiss = () => {
     }
 };
 
-const storeUrl = () => (isIOS() ? APP_STORE_URL : PLAY_STORE_URL);
-
 const markOpened = () => {
     cancelOpen = true;
 };
@@ -56,7 +47,7 @@ const clearOpenListeners = () => {
 
 const goToStore = () => {
     if (cancelOpen || document.hidden) return;
-    window.location.href = storeUrl();
+    window.location.href = storeUrlForDevice();
 };
 
 const openAppOrStore = () => {
@@ -75,7 +66,7 @@ const openAppOrStore = () => {
         opening.value = false;
     }, 1200);
 
-    if (isAndroid()) {
+    if (isAndroidDevice()) {
         const fallback = encodeURIComponent(PLAY_STORE_URL);
         window.location.href =
             `intent://#Intent;scheme=https;package=${ANDROID_PACKAGE};S.browser_fallback_url=${fallback};end`;
@@ -86,7 +77,7 @@ const openAppOrStore = () => {
 };
 
 onMounted(() => {
-    if (!isMobile() || wasDismissed() || isSafariIOS()) return;
+    if (!isMobileDevice() || wasDismissed() || isSafariIOS()) return;
     visible.value = true;
 });
 

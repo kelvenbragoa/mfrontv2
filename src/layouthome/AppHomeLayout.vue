@@ -1,6 +1,7 @@
 <script setup>
 import AppFooter from './AppFooter.vue';
 import AppHeader from './AppHeader.vue';
+import AppInstallDialog from './AppInstallDialog.vue';
 import AppOpenBanner from './AppOpenBanner.vue';
 </script>
 
@@ -13,5 +14,6 @@ import AppOpenBanner from './AppOpenBanner.vue';
             <app-footer></app-footer>
         </div>
     </div>
+    <app-install-dialog></app-install-dialog>
     <Toast />
 </template>
