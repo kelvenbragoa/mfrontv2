@@ -5,6 +5,7 @@ import { baseURL, storageURL } from '@/service/ApiConstant';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
+import EventLiveSetup from '@/components/live/EventLiveSetup.vue';
 
 const router = useRouter();
 const toast = useToast();
@@ -284,6 +285,8 @@ onMounted(() => {
                     </div>
                 </div>
             </div>
+
+            <EventLiveSetup :event-id="event.id" />
 
             <div class="card">
                 <div class="flex align-items-center justify-content-between mb-3">

@@ -1,11 +1,13 @@
 <script setup>
 import { onBeforeMount, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { useToast } from 'primevue/usetoast';
 import axios from 'axios';
-import router from '../../../router';
 import { baseURL } from '@/service/ApiConstant';
 
 const toast = useToast();
+const route = useRoute();
+const router = useRouter();
 
 const email = ref('');
 const password = ref('');
@@ -34,6 +36,12 @@ const validate = () => {
 };
 
 const redirectByRole = (user) => {
+    const redirect = route.query.redirect;
+    if (typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//')) {
+        router.replace(redirect);
+        return;
+    }
+
     if (user.role_id == 1) {
         router.replace('/admin/dashboard');
         return;

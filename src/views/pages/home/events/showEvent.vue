@@ -7,6 +7,7 @@ import { baseURL, storageURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { getPromotorPublicUrl, openPromotorPage, shouldUseSubdomainUrls, getCurrentPromotorSlug, getEventPublicUrl, getMainSiteUrl, getMainSiteOrigin } from '@/utils/promotorHost';
+import EventLiveWatch from '@/components/live/EventLiveWatch.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -60,6 +61,12 @@ const likesCount = computed(() => event.value?.like?.length || 0);
 const ticketsCount = computed(() => event.value?.tickets?.length || 0);
 const hasLineups = computed(() => (event.value?.lineups || []).length > 0);
 const hasRecommended = computed(() => recommended.value.length > 0);
+const liveStatus = ref(null);
+const isLiveActive = computed(() => liveStatus.value?.status === 'active' || liveStatus.value?.active === true);
+
+const onLiveStatus = (status) => {
+    liveStatus.value = status;
+};
 
 const heroBackground = computed(() => {
     if (!event.value?.image || brokenImages.value.has(`event-${event.value.id}`)) {
@@ -221,6 +228,7 @@ watch(() => route.params.id, getData);
                     Eventos
                 </router-link>
                 <div class="flex align-items-center gap-2 mb-3 flex-wrap">
+                    <Tag v-if="isLiveActive" value="Ao vivo" severity="danger" />
                     <Tag v-if="event.type?.name" :value="event.type.name" severity="info" />
                     <Tag :value="statusLabel" :severity="statusSeverity" />
                     <Tag v-if="event.category?.name" :value="event.category.name" />
@@ -319,6 +327,12 @@ watch(() => route.params.id, getData);
                         </p>
                     </div>
 
+                    <EventLiveWatch
+                        :event-id="event.slug || event.id"
+                        :checkout-path="'/checkout/' + event.slug + '/evento'"
+                        @status="onLiveStatus"
+                    />
+
                     <div class="detail-panel mb-4">
                         <h2 class="detail-title">Bilhetes</h2>
                         <div v-if="ticketsCount" class="ticket-list">
@@ -380,6 +394,7 @@ watch(() => route.params.id, getData);
                             {{ ticketsCount }} {{ ticketsCount === 1 ? 'tipo de bilhete' : 'tipos de bilhete' }}
                         </p>
                         <Tag :value="statusLabel" :severity="statusSeverity" class="mb-3" />
+                        <Tag v-if="isLiveActive" value="Ao vivo" severity="danger" class="mb-3 ml-2" />
 
                         <router-link v-if="isOnSale" :to="'/checkout/' + event.slug + '/evento'" class="w-full">
                             <Button label="Comprar bilhetes" class="w-full p-button-rounded border-none font-medium text-white bg-blue-500" />
