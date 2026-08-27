@@ -42,7 +42,8 @@ const schema = yup.object({
     start_date: yup.string().required().label('Data'),
     start_time: yup.string().required().label('Horas'),
     end_date: yup.string().required().label('Data'),
-    end_time: yup.string().required().label('Horas')
+    end_time: yup.string().required().label('Horas'),
+    is_live: yup.boolean().nullable()
 
     // email: yup.string().required().email().label('Email province_id'),
     // fullName: yup.string().required().label('Full name'),
@@ -70,6 +71,7 @@ const [start_time] = defineField('start_time');
 const [end_date] = defineField('end_date');
 const [end_time] = defineField('end_time');
 const [price] = defineField('price');
+const [is_live] = defineField('is_live');
 
 
 
@@ -77,7 +79,7 @@ const onSubmit = handleSubmit((values) => {
 
     isLoadingButton.value = true;
     axios
-        .put(`${baseURL}/promotor-tickets/${router.currentRoute.value.params.idbilhetes}`, values)
+        .put(`${baseURL}/promotor-tickets/${router.currentRoute.value.params.idbilhetes}`, { ...values, is_live: values.is_live ? 1 : 0 })
         .then((response) => {
             resetForm();
             router.back();
@@ -116,6 +118,7 @@ const getData = () => {
             max_per_order.value = retriviedData.value.max_per_order ?? '';
             price.value = retriviedData.value.price;
             description.value = retriviedData.value.description;
+            is_live.value = Boolean(Number(retriviedData.value.is_live));
 
 
             isLoadingDiv.value = false;
@@ -178,6 +181,13 @@ onMounted(() => {
                             />
                             <small class="text-600">Limita a quantidade no checkout web. Vazio = até 5. Não afecta o check-in.</small>
                             <small id="max_per_order-help" class="p-error block">{{ errors.max_per_order }}</small>
+                        </div>
+                        <div class="field">
+                            <div class="flex align-items-center gap-2">
+                                <InputSwitch v-model="is_live" inputId="is_live" />
+                                <label for="is_live" class="mb-0">Dá acesso à live online</label>
+                            </div>
+                            <small class="text-600">Este bilhete não é válido na entrada do evento. Só serve para ver a live no site.</small>
                         </div>
                         <div class="formgrid grid">
                             <div class="field col">

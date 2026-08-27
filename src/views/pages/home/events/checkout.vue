@@ -40,6 +40,8 @@ const [paymentNumber] = defineField('paymentNumber');
 const [user_id] = defineField('user_id');
 
 const isLoggedIn = computed(() => !!currentUser.value);
+const isLiveTicket = (item) => Boolean(item?.is_live);
+const liveRequiresLogin = (item) => isLiveTicket(item) && !isLoggedIn.value;
 const isPaidEvent = computed(() => event.value?.type_event_id == 1);
 const isEventClosed = computed(() => {
     if (!event.value?.end_date) return false;
@@ -90,17 +92,26 @@ const ticketWindow = (item) => {
     return { start, end };
 };
 
+const remainingQty = (item) => {
+    const raw = item?.available_quantity;
+    const n = raw === null || raw === undefined || raw === '' ? Number(item?.max_qtd) : Number(raw);
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
+};
+
 const isTicketUnavailable = (item) => {
     const start = moment(`${item.start_date} ${item.start_time}`);
     const end = moment(`${item.end_date} ${item.end_time}`);
-    return moment().isAfter(end) || Number(item.max_qtd) <= 0 || moment().isBefore(start);
+    return moment().isAfter(end) || remainingQty(item) <= 0 || moment().isBefore(start);
 };
 
-/** Limite de quantidade no checkout web (frontend only). Default 5 se não configurado. */
-const ticketOrderMax = (item) => {
+/** Máximo por compra. Default 5 se não configurado. */
+const ticketOrderCap = (item) => {
     const n = Number(item?.max_per_order);
     return Number.isFinite(n) && n > 0 ? n : 5;
 };
+
+/** Limite do selector: o menor entre máximo por compra e stock restante. */
+const ticketOrderMax = (item) => Math.max(0, Math.min(ticketOrderCap(item), remainingQty(item)));
 
 const blankAnswersFor = (ticket) => {
     const blank = {};
@@ -199,6 +210,28 @@ const onSubmit = handleSubmit(async (values) => {
         return;
     }
 
+    const overStock = selectedTickets.value.find((ticket) => Number(ticket.quantity) > ticketOrderMax(ticket));
+    if (overStock) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Quantidade indisponível',
+            detail: `Só restam ${ticketOrderMax(overStock)} bilhete(s) de "${overStock.name}".`,
+            life: 4000
+        });
+        return;
+    }
+
+    if (selectedTickets.value.some(isLiveTicket) && !isLoggedIn.value) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Inicia sessão',
+            detail: 'O bilhete de live só pode ser comprado com conta.',
+            life: 4000
+        });
+        goLogin();
+        return;
+    }
+
     if (isPaidEvent.value && !String(values.paymentNumber || '').trim()) {
         setErrors({ paymentNumber: 'Número de MPESA é obrigatório' });
         return;
@@ -244,6 +277,9 @@ const onSubmit = handleSubmit(async (values) => {
             detail: message,
             life: 4000
         });
+        if (error?.response?.status === 401) {
+            goLogin();
+        }
         if (error?.response?.data?.errors) {
             setErrors(error.response.data.errors);
         }
@@ -278,6 +314,13 @@ const getData = async () => {
     } finally {
         isLoadingDiv.value = false;
     }
+};
+
+const goLogin = () => {
+    router.push({
+        name: 'login',
+        query: { redirect: route.fullPath }
+    });
 };
 
 onMounted(() => {
@@ -350,6 +393,7 @@ onMounted(() => {
                                     <div class="ticket-card__top">
                                         <div>
                                             <h3 class="ticket-card__name">{{ item.name }}</h3>
+                                            <Tag v-if="item.is_live" value="Live online" severity="danger" class="ml-0 mt-1" />
                                             <p v-if="item.description" class="ticket-card__desc">{{ item.description }}</p>
                                             <p class="ticket-card__window">Vendas: {{ ticketWindow(item).start }} → {{ ticketWindow(item).end }}</p>
                                         </div>
@@ -358,6 +402,10 @@ onMounted(() => {
 
                                     <div v-if="isTicketUnavailable(item) || isEventClosed" class="mt-3">
                                         <Tag value="Bilhete indisponível" severity="danger" />
+                                    </div>
+                                    <div v-else-if="liveRequiresLogin(item)" class="mt-3">
+                                        <p class="ticket-card__desc mb-2">Inicia sessão para comprar o bilhete de live.</p>
+                                        <Button label="Entrar / Registar" icon="pi pi-sign-in" outlined size="small" @click="goLogin" />
                                     </div>
                                     <div v-else class="ticket-card__actions">
                                         <InputNumber
@@ -375,7 +423,12 @@ onMounted(() => {
                                                 <span class="pi pi-minus" />
                                             </template>
                                         </InputNumber>
-                                        <small class="text-600 block mt-2">Máx. {{ ticketOrderMax(item) }} por compra</small>
+                                        <small class="text-600 block mt-2">
+                                            Máx. {{ ticketOrderMax(item) }} por compra
+                                            <template v-if="remainingQty(item) < ticketOrderCap(item)">
+                                                · restam {{ remainingQty(item) }}
+                                            </template>
+                                        </small>
                                     </div>
                                 </div>
                             </div>

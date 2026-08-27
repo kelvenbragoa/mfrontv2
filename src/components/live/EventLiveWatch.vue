@@ -77,7 +77,7 @@ const startWatching = async () => {
                 query: { redirect: route.fullPath }
             });
         } else if (status === 403) {
-            watchError.value = error?.response?.data?.message || 'Precisas de um bilhete válido para ver esta live.';
+            watchError.value = error?.response?.data?.message || 'Precisas de um bilhete de live para ver esta transmissão.';
         } else {
             toast.add({
                 severity: 'error',
@@ -118,7 +118,7 @@ onBeforeUnmount(() => {
         <div v-else>
             <p class="detail-text">
                 {{ isActive ? 'Este evento está a transmitir agora.' : 'A live deste evento ainda não começou.' }}
-                Só quem tem bilhete (ou o promotor) pode assistir.
+                Só quem tem um bilhete de live pode assistir.
             </p>
 
             <Message v-if="watchError" severity="warn" :closable="false" class="mb-3">
@@ -134,7 +134,7 @@ onBeforeUnmount(() => {
                     @click="startWatching"
                 />
                 <router-link v-if="watchError && checkoutPath" :to="checkoutPath">
-                    <Button label="Comprar bilhete" outlined class="p-button-rounded" />
+                    <Button label="Comprar bilhete de live" outlined class="p-button-rounded" />
                 </router-link>
             </div>
         </div>

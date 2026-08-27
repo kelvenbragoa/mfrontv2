@@ -363,7 +363,14 @@ onMounted(() => {
                         </div>
 
                         <DataTable v-if="tickets.length" :value="tickets" responsiveLayout="scroll" class="p-datatable-sm">
-                            <Column field="name" header="Nome" sortable />
+                            <Column field="name" header="Nome" sortable>
+                                <template #body="slotProps">
+                                    <div class="flex align-items-center gap-2">
+                                        <span>{{ slotProps.data.name }}</span>
+                                        <Tag v-if="slotProps.data.is_live" value="Live" severity="danger" />
+                                    </div>
+                                </template>
+                            </Column>
                             <Column header="Preço" sortable field="price">
                                 <template #body="slotProps">{{ formatCurrency(slotProps.data.price) }}</template>
                             </Column>

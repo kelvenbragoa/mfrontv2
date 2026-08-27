@@ -34,7 +34,8 @@ const schema = yup.object({
     start_date: yup.string().required().label('Data'),
     start_time: yup.string().required().label('Horas'),
     end_date: yup.string().required().label('Data'),
-    end_time: yup.string().required().label('Horas')
+    end_time: yup.string().required().label('Horas'),
+    is_live: yup.boolean().nullable()
 
     // email: yup.string().required().email().label('Email province_id'),
     // fullName: yup.string().required().label('Full name'),
@@ -61,6 +62,7 @@ const [start_time] = defineField('start_time');
 const [end_date] = defineField('end_date');
 const [end_time] = defineField('end_time');
 const [price] = defineField('price');
+const [is_live] = defineField('is_live');
 
 
 
@@ -68,7 +70,7 @@ const onSubmit = handleSubmit((values) => {
 
     isLoadingButton.value = true;
     axios
-        .post(`${baseURL}/promotor-tickets`, values, {
+        .post(`${baseURL}/promotor-tickets`, { ...values, is_live: values.is_live ? 1 : 0 }, {
             headers: {
                 'Content-Type': 'multipart/form-data'
             }
@@ -114,6 +116,7 @@ const getCreateEvents = () => {
 };
 onMounted(() => {
     event_id.value = router.currentRoute.value.params.id
+    is_live.value = false;
     // getCreateEvents();
 });
 </script>
@@ -151,6 +154,13 @@ onMounted(() => {
                             <InputText v-model="max_qtd" id="max_qtd" type="number" :class="{ 'p-invalid': errors.max_qtd }" />
                             <InputText v-model="event_id" id="event_id" type="hidden" :class="{ 'p-invalid': errors.event_id }" />
                             <small id="max_qtd-help" class="p-error">{{ errors.max_qtd }}</small>
+                        </div>
+                        <div class="field">
+                            <div class="flex align-items-center gap-2">
+                                <InputSwitch v-model="is_live" inputId="is_live" />
+                                <label for="is_live" class="mb-0">Dá acesso à live online</label>
+                            </div>
+                            <small class="text-600">Este bilhete não é válido na entrada do evento. Só serve para ver a live no site.</small>
                         </div>
                         <div class="formgrid grid">
                             <div class="field col">

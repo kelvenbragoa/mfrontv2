@@ -210,6 +210,7 @@ onMounted(() => {
                 <Button label="Voltar" icon="pi pi-angle-left" text class="mb-2 p-0" @click="goBackUsingBack" />
                 <h4 class="m-0 text-900">{{ ticket.name }}</h4>
                 <span class="text-600">Detalhes do bilhete e formulário de inscrição</span>
+                <Tag v-if="ticket.is_live" value="Live — só online" severity="danger" class="mt-2" />
             </div>
             <Button label="Editar bilhete" icon="pi pi-pencil" outlined @click="goEditTicket" />
         </div>
@@ -224,6 +225,9 @@ onMounted(() => {
                     <p class="mb-0">
                         <strong>Máx. por compra:</strong>
                         {{ ticket.max_per_order || '5 (padrão)' }}
+                    </p>
+                    <p v-if="ticket.is_live" class="mb-0 mt-2 text-600">
+                        Este bilhete dá acesso à live e não é válido na entrada.
                     </p>
                 </div>
                 <div class="col-12 md:col-6">

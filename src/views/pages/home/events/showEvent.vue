@@ -338,7 +338,10 @@ watch(() => route.params.id, getData);
                         <div v-if="ticketsCount" class="ticket-list">
                             <div v-for="ticket in event.tickets" :key="ticket.id" class="ticket-row">
                                 <div>
-                                    <div class="ticket-row__name">{{ ticket.name }}</div>
+                                    <div class="flex align-items-center gap-2">
+                                        <div class="ticket-row__name">{{ ticket.name }}</div>
+                                        <Tag v-if="ticket.is_live" value="Live" severity="danger" />
+                                    </div>
                                     <div v-if="ticket.description" class="ticket-row__desc">{{ ticket.description }}</div>
                                 </div>
                                 <div class="ticket-row__price">{{ formatTicketPrice(ticket.price) }}</div>

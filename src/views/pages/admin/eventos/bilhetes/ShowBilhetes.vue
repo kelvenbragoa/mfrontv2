@@ -117,6 +117,7 @@ onMounted(() => {
             <p>Detalhes do Bilhete</p>
             
                 <p><strong>Nome: </strong>{{ retriviedData.name }}</p>
+                <Tag v-if="retriviedData.is_live" value="Live — só online" severity="danger" class="mb-2" />
                 <p><strong>Descrição: </strong>{{ retriviedData.description }}</p>
                 <p><strong>Preço: </strong>{{ retriviedData.price }}</p>
                 <p><strong>Quantidade Máxima: </strong>{{ retriviedData.max_qtd }}</p>
