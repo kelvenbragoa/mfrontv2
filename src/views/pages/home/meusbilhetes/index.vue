@@ -69,6 +69,10 @@ const imageSrc = (event) => {
 
 const ticketNumber = (ticket) => ticket?.ticket_number || `#0${ticket?.id ?? ''}`;
 
+const isLiveTicket = (ticket) => Boolean(ticket?.ticket?.is_live);
+
+const paymentReference = (ticket) => ticket?.sell?.transaction?.reference || '';
+
 const qrValue = (ticket) =>
     ticket?.qrcode ||
     JSON.stringify({
@@ -249,14 +253,28 @@ onMounted(() => {
                             />
                             <div class="ticket-card__body">
                                 <div class="ticket-card__meta">
-                                    <span>{{ ticketNumber(ticket) }}</span>
-                                    <Tag :value="resolveStatus(ticket).label" :severity="resolveStatus(ticket).severity" />
+                                    <span v-if="isLiveTicket(ticket)">Acesso live</span>
+                                    <span v-else>{{ ticketNumber(ticket) }}</span>
+                                    <Tag
+                                        v-if="isLiveTicket(ticket)"
+                                        value="Live online"
+                                        severity="danger"
+                                    />
+                                    <Tag
+                                        v-else
+                                        :value="resolveStatus(ticket).label"
+                                        :severity="resolveStatus(ticket).severity"
+                                    />
                                 </div>
                                 <h3 class="ticket-card__title">{{ ticket.event?.name || 'Evento' }}</h3>
                                 <p class="ticket-card__line">
                                     <i class="pi pi-ticket mr-2" />
                                     {{ ticket.ticket?.name || 'Bilhete' }}
                                     <span v-if="ticket.sell?.price"> · {{ formatMoney(ticket.sell.price) }}</span>
+                                </p>
+                                <p v-if="isLiveTicket(ticket) && paymentReference(ticket)" class="ticket-card__line">
+                                    <i class="pi pi-hashtag mr-2" />
+                                    Ref. {{ paymentReference(ticket) }}
                                 </p>
                                 <p class="ticket-card__line">
                                     <i class="pi pi-calendar mr-2" />
@@ -269,14 +287,23 @@ onMounted(() => {
                                     <span v-else>—</span>
                                 </p>
                                 <p class="ticket-card__line mb-3">
-                                    <i class="pi pi-map-marker mr-2" />
-                                    {{ eventLocation(ticket.event) }}
+                                    <i class="pi pi-video mr-2" v-if="isLiveTicket(ticket)" />
+                                    <i class="pi pi-map-marker mr-2" v-else />
+                                    {{ isLiveTicket(ticket) ? 'Transmissão live — sem entrada no recinto' : eventLocation(ticket.event) }}
                                 </p>
                                 <div class="ticket-card__actions">
                                     <Button
+                                        v-if="!isLiveTicket(ticket)"
                                         label="Ver QR"
                                         icon="pi pi-qrcode"
                                         class="p-button-rounded border-none font-medium text-white bg-blue-500"
+                                        @click="openTicket(ticket)"
+                                    />
+                                    <Button
+                                        v-else
+                                        label="Ver acesso"
+                                        icon="pi pi-video"
+                                        class="p-button-rounded p-button-outlined"
                                         @click="openTicket(ticket)"
                                     />
                                     <router-link v-if="ticket.event?.slug" :to="'/eventos/' + ticket.event.slug">
@@ -333,6 +360,26 @@ onMounted(() => {
         :breakpoints="{ '960px': '90vw' }"
     >
         <div v-if="selectedTicket" class="qr-dialog">
+            <template v-if="isLiveTicket(selectedTicket)">
+                <Tag value="Live online" severity="danger" class="mb-3" />
+                <div class="live-dialog">
+                    <i class="pi pi-video live-dialog__icon" />
+                    <p class="qr-dialog__id">Acesso à transmissão live</p>
+                    <p class="qr-dialog__type">{{ selectedTicket.ticket?.name }}</p>
+                    <p v-if="paymentReference(selectedTicket)" class="live-dialog__ref">
+                        Referência: {{ paymentReference(selectedTicket) }}
+                    </p>
+                    <p class="qr-dialog__meta">
+                        <span v-if="selectedTicket.event?.start_date">
+                            {{ moment(selectedTicket.event.start_date).format('LL') }}
+                        </span>
+                    </p>
+                </div>
+                <Message severity="warn" :closable="false" class="w-full mt-3">
+                    Este acesso não tem QR Code e não é válido na entrada do evento.
+                </Message>
+            </template>
+            <template v-else>
             <Tag :value="resolveStatus(selectedTicket).label" :severity="resolveStatus(selectedTicket).severity" class="mb-3" />
             <div class="qr-dialog__code">
                 <qrcode-vue :value="qrValue(selectedTicket)" :size="180" level="H" render-as="svg" />
@@ -356,6 +403,7 @@ onMounted(() => {
             <Message v-else severity="warn" :closable="false" class="w-full mt-3">
                 Este bilhete já não está válido para entrada.
             </Message>
+            </template>
         </div>
     </Dialog>
 </template>
@@ -521,6 +569,22 @@ onMounted(() => {
 .qr-dialog__meta {
     margin: 0;
     color: #64748b;
+}
+
+.live-dialog {
+    padding: 0.5rem 0 0.25rem;
+}
+
+.live-dialog__icon {
+    font-size: 2.4rem;
+    color: #dc2626;
+}
+
+.live-dialog__ref {
+    margin: 0.65rem 0 0.35rem;
+    font-weight: 700;
+    color: #2563eb;
+    letter-spacing: 0.03em;
 }
 
 @keyframes hero-fade {

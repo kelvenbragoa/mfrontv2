@@ -75,6 +75,8 @@ const selectedTickets = computed(() => {
     return (tickets.value || []).filter((ticket) => Number(ticket.quantity) > 0);
 });
 
+const buyingOnlyLive = computed(() => selectedTickets.value.length > 0 && selectedTickets.value.every(isLiveTicket));
+
 const ticketFormFields = (ticket) => {
     const fields = ticket?.form_fields || ticket?.formFields || [];
     return Array.isArray(fields) ? fields : [];
@@ -584,7 +586,7 @@ onMounted(() => {
                             </div>
 
                             <div class="field">
-                                <label for="customerEmail">Email (recebes o bilhete aqui)</label>
+                                <label for="customerEmail">{{ buyingOnlyLive ? 'Email' : 'Email (recebes o bilhete aqui)' }}</label>
                                 <InputText
                                     id="customerEmail"
                                     v-model="customerEmail"
@@ -630,6 +632,9 @@ onMounted(() => {
 
                             <Message v-if="!isLoggedIn" severity="info" :closable="false" class="w-full mb-3">
                                 Regista-te para guardar o histórico dos teus bilhetes.
+                            </Message>
+                            <Message v-if="buyingOnlyLive" severity="warn" :closable="false" class="w-full mb-3">
+                                Este acesso é só para a live. Não enviaremos QR Code por email ou WhatsApp.
                             </Message>
 
                             <Button

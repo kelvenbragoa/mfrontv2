@@ -25,6 +25,19 @@ const totalAmount = computed(() => {
     return (orders.value || []).reduce((sum, order) => sum + Number(order.total || order.price * order.qty || 0), 0);
 });
 
+const isLiveOrder = (item) => Boolean(item?.ticket?.is_live);
+const liveOrders = computed(() => (orders.value || []).filter(isLiveOrder));
+const physicalOrders = computed(() => (orders.value || []).filter((item) => !isLiveOrder(item)));
+const hasLiveTickets = computed(() => liveOrders.value.length > 0);
+const hasPhysicalTickets = computed(() => physicalOrders.value.length > 0);
+const liveTicketCount = computed(() =>
+    liveOrders.value.reduce((sum, order) => sum + (order.selldetails?.length || Number(order.qty) || 0), 0)
+);
+const paymentReference = computed(() => {
+    const withRef = (orders.value || []).find((order) => order.transaction?.reference);
+    return withRef?.transaction?.reference || '';
+});
+
 const locationLabel = computed(() => {
     if (!event.value) return '';
     const province = event.value.province?.name;
@@ -109,7 +122,15 @@ onMounted(() => {
                 </div>
                 <h1 class="order-hero__title">Obrigado, {{ buyerName }}!</h1>
                 <p class="order-hero__subtitle">
-                    Os teus bilhetes estão prontos. Guarda o QR Code e apresenta-o na entrada.
+                    <template v-if="hasLiveTickets && !hasPhysicalTickets">
+                        Adquiriste o acesso à transmissão live. Este acesso não é válido na entrada do evento.
+                    </template>
+                    <template v-else-if="hasLiveTickets">
+                        Os teus bilhetes de entrada estão prontos. O acesso live não inclui QR Code nem entrada no recinto.
+                    </template>
+                    <template v-else>
+                        Os teus bilhetes estão prontos. Guarda o QR Code e apresenta-o na entrada.
+                    </template>
                 </p>
             </div>
         </section>
@@ -156,11 +177,15 @@ onMounted(() => {
                         <p class="summary-contact mb-1"><i class="pi pi-envelope mr-2" />{{ buyerEmail }}</p>
                         <p class="summary-contact"><i class="pi pi-mobile mr-2" />{{ buyerMobile }}</p>
 
-                        <Message severity="info" :closable="false" class="w-full mb-3">
+                        <Message v-if="hasPhysicalTickets" severity="info" :closable="false" class="w-full mb-3">
                             Também enviámos o bilhete por email e WhatsApp, quando disponíveis.
+                        </Message>
+                        <Message v-else-if="hasLiveTickets" severity="warn" :closable="false" class="w-full mb-3">
+                            Este acesso é só para a live online. Não serve para entrar no recinto.
                         </Message>
 
                         <Button
+                            v-if="hasPhysicalTickets"
                             :label="isDownloading ? 'A preparar PDF...' : 'Baixar bilhetes'"
                             icon="pi pi-download"
                             class="w-full p-button-rounded border-none font-medium text-white bg-blue-500 mb-2"
@@ -179,6 +204,30 @@ onMounted(() => {
 
                 <div class="col-12 lg:col-8">
                     <div class="detail-panel">
+                        <div v-if="hasLiveTickets" class="live-access mb-4">
+                            <Tag value="Live online" severity="danger" class="mb-3" />
+                            <h2 class="detail-title mb-2">Acesso à transmissão live</h2>
+                            <p class="detail-text">
+                                Adquiriste {{ liveTicketCount }}
+                                {{ liveTicketCount === 1 ? 'bilhete' : 'bilhetes' }}
+                                para a transmissão live de
+                                <strong>{{ event?.name }}</strong>.
+                                Este acesso não inclui entrada no recinto e não tem QR Code.
+                            </p>
+                            <div v-for="item in liveOrders" :key="'live-' + item.id" class="live-access__row">
+                                <span>{{ item.qty || item.selldetails?.length || 1 }}× {{ item.ticket?.name || 'Bilhete live' }}</span>
+                                <strong>{{ formatMoney(item.total || item.price * item.qty) }}</strong>
+                            </div>
+                            <div v-if="paymentReference" class="live-access__ref">
+                                <span>Referência de pagamento</span>
+                                <strong>{{ paymentReference }}</strong>
+                            </div>
+                            <Message severity="warn" :closable="false" class="w-full mt-3 mb-0">
+                                Não apresentes este comprovativo na portaria. Os protocolos não o devem aceitar como bilhete de entrada.
+                            </Message>
+                        </div>
+
+                        <div v-if="hasPhysicalTickets">
                         <div class="flex flex-column md:flex-row md:align-items-center md:justify-content-between gap-2 mb-3">
                             <div>
                                 <h2 class="detail-title mb-1">Os teus bilhetes</h2>
@@ -195,7 +244,7 @@ onMounted(() => {
                         </div>
 
                         <div id="myticket" class="tickets-print">
-                            <div v-for="item in orders" :key="item.id" class="order-group">
+                            <div v-for="item in physicalOrders" :key="item.id" class="order-group">
                                 <p class="order-group__label">Encomenda #{{ item.id }} · {{ item.ticket?.name || item.name }}</p>
 
                                 <div class="ticket" v-for="detail in item.selldetails" :key="detail.id">
@@ -259,6 +308,7 @@ onMounted(() => {
                                     </div>
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -335,6 +385,34 @@ onMounted(() => {
 .detail-text {
     color: #64748b;
     line-height: 1.5;
+}
+
+.live-access {
+    border: 1px solid #fecaca;
+    border-radius: 1rem;
+    padding: 1.15rem;
+    background: #fff7f7;
+}
+
+.live-access__row,
+.live-access__ref {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: 0.7rem;
+    color: #475569;
+}
+
+.live-access__ref {
+    margin-top: 1rem;
+    padding-top: 0.85rem;
+    border-top: 1px dashed #fecaca;
+    color: #0f172a;
+}
+
+.live-access__ref strong {
+    letter-spacing: 0.04em;
+    color: #2563eb;
 }
 
 .event-summary {
