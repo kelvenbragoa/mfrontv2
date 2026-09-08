@@ -143,6 +143,28 @@ const captureTicketEl = async (ticketEl) => {
 
 const safeFileName = (name) => (name || 'bilhete').replace(/[\\/:*?"<>|]+/g, '').trim() || 'bilhete';
 
+const addTicketPage = (pdf, canvas) => {
+    const pageWidth = (canvas.width / 3) * PX_TO_MM;
+    const pageHeight = (canvas.height / 3) * PX_TO_MM;
+    const orientation = pageWidth >= pageHeight ? 'l' : 'p';
+    const image = canvas.toDataURL('image/jpeg', 0.92);
+
+    if (!pdf) {
+        pdf = new jsPDF({
+            orientation,
+            unit: 'mm',
+            format: [pageWidth, pageHeight],
+            compress: true
+        });
+    } else {
+        pdf.addPage([pageWidth, pageHeight], orientation);
+    }
+
+    pdf.addImage(image, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+
+    return pdf;
+};
+
 export function useTicketPdf() {
     const isDownloading = ref(false);
 
@@ -155,24 +177,7 @@ export function useTicketPdf() {
             let pdf = null;
 
             for (const ticketEl of tickets) {
-                const canvas = await captureTicketEl(ticketEl);
-                const pageWidth = (canvas.width / 3) * PX_TO_MM;
-                const pageHeight = (canvas.height / 3) * PX_TO_MM;
-                const orientation = pageWidth >= pageHeight ? 'l' : 'p';
-                const image = canvas.toDataURL('image/png');
-
-                if (!pdf) {
-                    pdf = new jsPDF({
-                        orientation,
-                        unit: 'mm',
-                        format: [pageWidth, pageHeight],
-                        compress: true
-                    });
-                } else {
-                    pdf.addPage([pageWidth, pageHeight], orientation);
-                }
-
-                pdf.addImage(image, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+                pdf = addTicketPage(pdf, await captureTicketEl(ticketEl));
             }
 
             pdf?.save(`MTicket-${safeFileName(fileName)}.pdf`);
@@ -188,24 +193,7 @@ export function useTicketPdf() {
         let pdf = null;
 
         for (const ticketEl of tickets) {
-            const canvas = await captureTicketEl(ticketEl);
-            const pageWidth = (canvas.width / 3) * PX_TO_MM;
-            const pageHeight = (canvas.height / 3) * PX_TO_MM;
-            const orientation = pageWidth >= pageHeight ? 'l' : 'p';
-            const image = canvas.toDataURL('image/png');
-
-            if (!pdf) {
-                pdf = new jsPDF({
-                    orientation,
-                    unit: 'mm',
-                    format: [pageWidth, pageHeight],
-                    compress: true
-                });
-            } else {
-                pdf.addPage([pageWidth, pageHeight], orientation);
-            }
-
-            pdf.addImage(image, 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+            pdf = addTicketPage(pdf, await captureTicketEl(ticketEl));
         }
 
         return pdf ? pdf.output('blob') : null;
