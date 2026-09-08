@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import axios from 'axios';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { baseURL } from '@/service/ApiConstant';
@@ -39,55 +40,79 @@ const isImageBlob = (blob) => {
     return blob.type.startsWith('image/') || blob.type === 'application/octet-stream';
 };
 
+const mediaUrlsFromSrc = (src) => {
+    const path = storagePathFromUrl(src);
+    if (!path) return null;
+    const encoded = path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+    return {
+        path,
+        dataUrl: `${baseURL}/media?path=${encodeURIComponent(path)}`,
+        // trailing slash: nginx 404s /api/media/event/foto.jpg (static .jpg rule)
+        fileUrl: `${baseURL}/media/${encoded}/`
+    };
+};
+
 const fetchAsDataUrl = async (src) => {
     if (imageDataUrlCache.has(src)) return imageDataUrlCache.get(src);
 
-    const path = storagePathFromUrl(src);
-    const candidates = [];
-    if (path) {
-        const encoded = path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
-        candidates.push(`${baseURL}/media/${encoded}`);
-        candidates.push(`/storage/${path}`);
-    }
-    candidates.push(src);
+    const urls = mediaUrlsFromSrc(src);
+    if (!urls) throw new Error('image path missing');
 
-    let lastError = null;
-    for (const url of candidates) {
-        try {
-            const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
-            if (!response.ok) continue;
-            const blob = await response.blob();
-            if (!isImageBlob(blob)) continue;
-            const dataUrl = await blobToDataUrl(blob);
-            imageDataUrlCache.set(src, dataUrl);
-            return dataUrl;
-        } catch (error) {
-            lastError = error;
+    try {
+        const { data } = await axios.get(urls.dataUrl, {
+            params: { as: 'data' },
+            timeout: 20000
+        });
+        if (typeof data?.data_uri === 'string' && data.data_uri.startsWith('data:')) {
+            imageDataUrlCache.set(src, data.data_uri);
+            return data.data_uri;
         }
+    } catch {
+        /* same file via blob — works on current nginx with trailing slash */
     }
 
-    throw lastError || new Error('image fetch failed');
+    const response = await axios.get(urls.fileUrl, {
+        responseType: 'blob',
+        timeout: 20000
+    });
+    const blob = response.data;
+    if (!isImageBlob(blob)) throw new Error('image fetch failed');
+    const dataUrl = await blobToDataUrl(blob);
+    imageDataUrlCache.set(src, dataUrl);
+    return dataUrl;
 };
 
 const applyTicketImageDataUrl = (img, dataUrl) => {
     img.src = dataUrl;
+    img.removeAttribute('crossorigin');
     const panel = img.closest('.ticket-image');
     if (panel) {
         panel.style.setProperty('--event-image', `url("${dataUrl}")`);
-        panel.style.backgroundImage = `url("${dataUrl}")`;
+        panel.style.setProperty('background-image', `url("${dataUrl}")`, 'important');
+        panel.style.backgroundSize = 'cover';
+        panel.style.backgroundPosition = 'center';
     }
+};
+
+const paintClonedTicketImage = (panel) => {
+    const img = panel.querySelector('.ticket-image__photo');
+    const src = img?.currentSrc || img?.src || '';
+    if (!src.startsWith('data:')) return;
+    panel.style.setProperty('background-image', `url("${src}")`, 'important');
+    panel.style.backgroundSize = 'cover';
+    panel.style.backgroundPosition = 'center';
 };
 
 const inlineTicketImages = async (root) => {
     const imgs = [...root.querySelectorAll('.ticket-image__photo')];
     await Promise.all(
         imgs.map(async (img) => {
-            const src = img.getAttribute('src');
+            const src = img.getAttribute('src') || img.src;
             if (!src || src.startsWith('data:')) return;
             try {
                 applyTicketImageDataUrl(img, await fetchAsDataUrl(src));
             } catch {
-                /* html2canvas cannot paint cross-origin storage images */
+                /* html2canvas cannot paint cross-origin /storage images */
             }
             await waitForImage(img);
         })
@@ -108,15 +133,7 @@ const captureTicketEl = async (ticketEl) => {
             scrollX: window.scrollX,
             scrollY: window.scrollY,
             onclone: (_doc, cloned) => {
-                cloned.querySelectorAll('.ticket-image__photo').forEach((img) => {
-                    if (!img.src?.startsWith('data:')) return;
-                    const panel = img.closest('.ticket-image');
-                    if (panel) {
-                        panel.style.backgroundImage = `url("${img.src}")`;
-                        panel.style.backgroundSize = 'cover';
-                        panel.style.backgroundPosition = 'center';
-                    }
-                });
+                cloned.querySelectorAll('.ticket-image').forEach(paintClonedTicketImage);
             }
         });
     } finally {
