@@ -11,6 +11,14 @@ export default defineConfig(() => {
             alias: {
                 '@': fileURLToPath(new URL('./src', import.meta.url))
             }
+        },
+        server: {
+            proxy: {
+                '/storage': {
+                    target: 'http://10.45.64.193:8000',
+                    changeOrigin: true
+                }
+            }
         }
     };
 });

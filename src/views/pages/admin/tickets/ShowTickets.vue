@@ -1,11 +1,12 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { baseURL, storageURL } from '@/service/ApiConstant';
+import { baseURL } from '@/service/ApiConstant';
 import axios from 'axios';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
-import QrcodeVue from 'qrcode.vue';
+import DigitalTicket from '@/components/ticket/DigitalTicket.vue';
+import { useTicketPdf } from '@/composables/useTicketPdf';
 
 const router = useRouter();
 const toast = useToast();
@@ -15,6 +16,14 @@ const ticketId = router.currentRoute.value.params.id;
 const isLoading = ref(true);
 const loadError = ref(null);
 const data = ref(null);
+const resendDialog = ref(false);
+const isResending = ref(false);
+const resendForm = ref({
+    email: '',
+    mobile: ''
+});
+
+const { isDownloading, downloadTicketsBySelector, buildPdfBlobFromElements } = useTicketPdf();
 
 const getData = async () => {
     isLoading.value = true;
@@ -53,24 +62,40 @@ const formatDate = (value) => (value ? moment(value).format('DD/MM/YYYY') : '--'
 
 const formatDateTime = (value) => (value ? moment(value).format('DD/MM/YYYY HH:mm') : '--');
 
-const formatTime = (value) => (value ? moment(value, 'HH:mm:ss').format('HH:mm') : '--');
-
 const event = computed(() => data.value?.event ?? null);
 
-const isValid = computed(() => Number(data.value?.status) === 1);
+const isValid = computed(() => Number(data.value?.status) === 1 && !data.value?.verified_at);
 
-const statusTag = computed(() =>
-    isValid.value ? { label: 'Por usar', severity: 'success' } : { label: 'Validado à entrada', severity: 'secondary' }
-);
+const isLiveTicket = computed(() => Boolean(data.value?.ticket?.is_live));
+
+const statusTag = computed(() => {
+    if (isLiveTicket.value) return { label: 'Live online', severity: 'danger' };
+    if (!isValid.value) return { label: 'Validado à entrada', severity: 'secondary' };
+    if (event.value?.end_date && moment().isAfter(moment(event.value.end_date).endOf('day'))) {
+        return { label: 'Expirado', severity: 'warn' };
+    }
+    return { label: 'Por usar', severity: 'success' };
+});
+
+const ticketStatusKey = computed(() => {
+    if (!data.value) return 'valid';
+    if (Number(data.value.status) === 0 || data.value.verified_at) return 'used';
+    if (event.value?.end_date && moment().isAfter(moment(event.value.end_date).endOf('day'))) return 'expired';
+    return 'valid';
+});
 
 const ticketNumber = computed(() => data.value?.ticket_number || (data.value ? `#0${data.value.id}` : ''));
 
 const qrValue = computed(() => {
     if (!data.value) return '';
-    return data.value.qrcode || JSON.stringify({ s: data.value.status, i: data.value.id, ie: data.value.event_id });
+    return data.value.qrcode || JSON.stringify({
+        s: data.value.status,
+        i: data.value.id,
+        ie: data.value.event_id
+    });
 });
 
-const eventImage = computed(() => (event.value?.image ? `${storageURL}${event.value.image}` : '/demo/images/mticket.jpg'));
+const ticketPrice = computed(() => data.value?.ticket?.price ?? data.value?.sell?.price ?? 0);
 
 const copyReference = async () => {
     const reference = data.value?.sell?.transaction?.reference;
@@ -79,8 +104,90 @@ const copyReference = async () => {
     try {
         await navigator.clipboard.writeText(reference);
         toast.add({ severity: 'success', summary: 'Copiado', detail: 'Referência copiada.', life: 2000 });
-    } catch (error) {
+    } catch {
         toast.add({ severity: 'warn', summary: 'Não foi possível copiar', detail: reference, life: 4000 });
+    }
+};
+
+const downloadTicket = async () => {
+    try {
+        await downloadTicketsBySelector('#admin-digital-ticket .ticket', event.value?.name || ticketNumber.value);
+    } catch {
+        toast.add({
+            severity: 'error',
+            summary: 'Erro',
+            detail: 'Não foi possível gerar o PDF.',
+            life: 4000
+        });
+    }
+};
+
+const openResendDialog = () => {
+    resendForm.value = {
+        email: data.value?.email || data.value?.sell?.email || '',
+        mobile: data.value?.mobile || data.value?.sell?.mobile || ''
+    };
+    resendDialog.value = true;
+};
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const submitResend = async () => {
+    const email = resendForm.value.email?.trim();
+    if (!email) {
+        toast.add({ severity: 'warn', summary: 'Email obrigatório', detail: 'Indica o email do cliente.', life: 3000 });
+        return;
+    }
+
+    isResending.value = true;
+    try {
+        const form = new FormData();
+        form.append('email', email);
+        form.append('mobile', resendForm.value.mobile?.trim() || '');
+
+        if (!isLiveTicket.value) {
+            await nextTick();
+            await wait(200);
+            const ticketEls = document.querySelectorAll('#admin-digital-ticket .ticket');
+            const blob = await buildPdfBlobFromElements(ticketEls);
+            if (!blob) {
+                toast.add({
+                    severity: 'error',
+                    summary: 'Erro',
+                    detail: 'Não foi possível gerar o PDF do bilhete.',
+                    life: 4000
+                });
+                return;
+            }
+            form.append('pdf', blob, 'ticket.pdf');
+        }
+
+        const response = await axios.post(`${baseURL}/admin-tickets/${ticketId}/resend`, form);
+        if (response.data.ticket) {
+            data.value = response.data.ticket;
+        } else {
+            data.value.email = email;
+            data.value.mobile = resendForm.value.mobile?.trim() || data.value.mobile;
+        }
+
+        resendDialog.value = false;
+        toast.add({
+            severity: 'success',
+            summary: 'Bilhete reenviado',
+            detail: isLiveTicket.value
+                ? 'O acesso foi enviado para o email indicado.'
+                : 'O bilhete foi enviado para o email indicado.',
+            life: 4000
+        });
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Não foi possível reenviar',
+            detail: error?.response?.data?.message || 'Tenta novamente dentro de momentos.',
+            life: 5000
+        });
+    } finally {
+        isResending.value = false;
     }
 };
 
@@ -137,7 +244,7 @@ onMounted(() => {
                     </div>
                     <div>
                         <span class="detail-label">Valor</span>
-                        <span class="detail-value">{{ formatCurrency(data.ticket?.price ?? data.sell?.price) }}</span>
+                        <span class="detail-value">{{ formatCurrency(ticketPrice) }}</span>
                     </div>
                     <div>
                         <span class="detail-label">Data do evento</span>
@@ -173,85 +280,87 @@ onMounted(() => {
                     </div>
                 </div>
 
-                <Message v-if="!isValid" severity="info" :closable="false" class="mt-4">
+                <Message v-if="!isValid && !isLiveTicket" severity="info" :closable="false" class="mt-4">
                     Este bilhete já foi validado à entrada e não pode ser reutilizado.
                 </Message>
+
+                <div class="flex flex-wrap gap-2 mt-4">
+                    <Button
+                        v-if="!isLiveTicket"
+                        label="Baixar PDF"
+                        icon="pi pi-download"
+                        outlined
+                        :loading="isDownloading"
+                        :disabled="isDownloading || isResending"
+                        @click="downloadTicket"
+                    />
+                    <Button
+                        label="Reenviar bilhete"
+                        icon="pi pi-send"
+                        class="border-none font-medium text-white bg-blue-500"
+                        @click="openResendDialog"
+                    />
+                </div>
             </div>
 
             <div class="card">
                 <h5 class="mt-0 mb-4">Bilhete</h5>
 
-                <div class="ticket-wrapper">
-                    <div class="ticket">
-                        <div class="left">
-                            <div class="image" :style="{ backgroundImage: `url(${eventImage})` }">
-                                <p class="admit-one">
-                                    <span>Mticket</span>
-                                    <span>Mticket</span>
-                                    <span>Mticket</span>
-                                </p>
-                                <div class="ticket-number">
-                                    <p>{{ ticketNumber }}</p>
-                                </div>
-                            </div>
-                            <div class="ticket-info">
-                                <p class="date">
-                                    <span>{{ event ? moment(event.start_date).format('dddd') : '--' }}</span>
-                                    <span class="day-month">
-                                        {{ event ? moment(event.start_date).format('D') : '--' }} -
-                                        {{ event ? moment(event.start_date).format('MM') : '--' }}
-                                    </span>
-                                    <span>{{ event ? moment(event.start_date).format('YYYY') : '--' }}</span>
-                                </p>
-                                <div class="show-name">
-                                    <h1>{{ event?.name || 'Evento' }}</h1>
-                                    <br />
-                                    <h2>{{ data.name }}</h2>
-                                    <h2>{{ data.ticket?.name }}</h2>
-                                    <div class="cardticket">
-                                        <p>{{ data.ticket?.description }}</p>
-                                    </div>
-                                </div>
-                                <div class="time">
-                                    <p>{{ formatTime(event?.start_time) }}</p>
-                                </div>
-                                <p class="location">
-                                    <span>{{ event?.address || '--' }}</span>
-                                    <span class="separator"> </span>
-                                    <span>{{ event?.province?.name ? `${event.province.name}, Moçambique` : 'Moçambique' }}</span>
-                                </p>
-                            </div>
-                        </div>
-                        <div class="right">
-                            <p class="admit-one">
-                                <span>Mticket</span>
-                                <span>Mticket</span>
-                                <span>Mticket</span>
-                            </p>
-                            <div class="right-info-container">
-                                <div class="show-name">
-                                    <h1>{{ event?.name || 'Evento' }}</h1>
-                                </div>
-                                <div class="time">
-                                    <p>{{ formatTime(event?.start_time) }} até {{ formatTime(event?.end_time) }}</p>
-                                </div>
-                                <div class="barcode">
-                                    <qrcode-vue :value="qrValue" :size="100" level="H" render-as="svg" />
-                                </div>
-                                <p class="ticket-number">{{ ticketNumber }}</p>
-                            </div>
-                        </div>
+                <div v-if="isLiveTicket">
+                    <Message severity="warn" :closable="false">
+                        Este acesso é só para a live online. Não tem QR Code e não é válido na entrada.
+                    </Message>
+                </div>
+                <div v-else id="admin-digital-ticket" class="admin-ticket-preview">
+                    <div class="ticket-wrapper">
+                        <DigitalTicket
+                            :event="event"
+                            :code="ticketNumber"
+                            :qr-value="qrValue"
+                            :type-name="data.ticket?.name"
+                            :buyer-name="data.name"
+                            :price="ticketPrice"
+                            :status="ticketStatusKey"
+                        />
                     </div>
                 </div>
             </div>
         </template>
+
+        <Dialog
+            v-model:visible="resendDialog"
+            header="Reenviar bilhete"
+            :style="{ width: '28rem' }"
+            :modal="true"
+            :draggable="false"
+        >
+            <p class="text-600 mt-0 mb-3">
+                Corrige o email ou o telemóvel se o cliente os escreveu mal. Gravamos os novos dados e reenviamos o bilhete.
+            </p>
+            <div class="field">
+                <label for="resend-email">Email</label>
+                <InputText id="resend-email" v-model="resendForm.email" type="email" class="w-full" />
+            </div>
+            <div class="field">
+                <label for="resend-mobile">Telemóvel</label>
+                <InputText id="resend-mobile" v-model="resendForm.mobile" class="w-full" />
+                <small class="text-500">Se estiver preenchido, também tentamos enviar por WhatsApp.</small>
+            </div>
+            <template #footer>
+                <Button label="Cancelar" text :disabled="isResending" @click="resendDialog = false" />
+                <Button
+                    label="Reenviar"
+                    icon="pi pi-send"
+                    :loading="isResending"
+                    :disabled="isResending"
+                    @click="submitResend"
+                />
+            </template>
+        </Dialog>
     </div>
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Staatliches&display=swap');
-
 .detail-grid {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -280,184 +389,17 @@ onMounted(() => {
     padding: 3rem 1rem;
 }
 
-.ticket-wrapper {
+.admin-ticket-preview {
     overflow-x: auto;
-    padding-bottom: 0.5rem;
+    padding: 1rem 0.75rem;
+    background: #eaf3f9;
+    border-radius: 1.25rem;
 }
 
-.ticket {
-    margin: auto;
-    display: flex;
-    width: max-content;
-    background: white;
-    color: black;
-    font-family: 'Staatliches', cursive;
-    font-size: 14px;
-    letter-spacing: 0.1em;
-    box-shadow: rgba(0, 0, 0, 0.3) 0px 19px 38px, rgba(0, 0, 0, 0.22) 0px 15px 12px;
-}
-
-.left {
-    display: flex;
-}
-
-.image {
-    height: 250px;
-    width: 250px;
-    background-size: cover;
-    background-position: center;
-    opacity: 0.85;
-}
-
-.admit-one {
-    position: absolute;
-    color: darkgray;
-    height: 250px;
-    padding: 0 10px;
-    letter-spacing: 0.15em;
-    display: flex;
-    text-align: center;
-    justify-content: space-around;
-    writing-mode: vertical-rl;
-    transform: rotate(-180deg);
-}
-
-.admit-one span:nth-child(2) {
-    color: white;
-    font-weight: 700;
-}
-
-.left .ticket-number {
-    height: 250px;
-    width: 250px;
-    display: flex;
-    justify-content: flex-end;
-    align-items: flex-end;
-    padding: 5px;
-}
-
-.ticket-info {
-    padding: 10px 30px;
-    display: flex;
-    flex-direction: column;
-    text-align: center;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.date {
-    border-top: 1px solid gray;
-    border-bottom: 1px solid gray;
-    padding: 5px 0;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-}
-
-.date span {
-    width: 100px;
-}
-
-.date span:first-child {
-    text-align: left;
-}
-
-.date span:last-child {
-    text-align: right;
-}
-
-.date .day-month {
-    color: #d83565;
-    font-size: 20px;
-}
-
-.show-name {
-    font-size: 20px;
-    font-family: 'Open Sans', cursive;
-    color: #d83565;
-}
-
-.show-name h1 {
-    font-size: 38px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    color: black;
-}
-
-.time {
-    padding: 10px 0;
-    color: black;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    font-weight: 700;
-}
-
-.left .time {
-    font-size: 16px;
-}
-
-.location {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
+.ticket-wrapper {
     width: 100%;
-    padding-top: 8px;
-    border-top: 1px solid gray;
-}
-
-.location .separator {
-    font-size: 20px;
-}
-
-.right {
-    width: 180px;
-    border-left: 1px dashed #404040;
-}
-
-.right .admit-one {
-    color: darkgray;
-}
-
-.right .admit-one span:nth-child(2) {
-    color: gray;
-}
-
-.right .right-info-container {
-    height: 250px;
-    padding: 10px 10px 10px 35px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-around;
-    align-items: center;
-}
-
-.right .show-name h1 {
-    font-size: 18px;
-}
-
-.barcode {
-    height: 100px;
-}
-
-.right .ticket-number {
-    color: gray;
-}
-
-.cardticket {
-    padding: 10px 30px;
-    display: flex;
-    flex-direction: column;
-    text-align: center;
-    justify-content: space-between;
-    align-items: center;
-    max-width: 50ch;
-}
-
-.cardticket p {
-    color: black;
+    max-width: 980px;
+    margin: 0 auto;
 }
 
 @media (max-width: 991px) {

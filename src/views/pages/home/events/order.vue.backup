@@ -1,14 +1,14 @@
 <script setup>
-import { computed, nextTick, onMounted, ref } from 'vue';
-import axios from 'axios';
-import { baseURL, storageURL } from '@/service/ApiConstant';
+import { computed, onMounted, ref } from 'vue';
+import { storageURL, styleURL } from '@/service/ApiConstant';
 import moment from 'moment';
-import DigitalTicket from '@/components/ticket/DigitalTicket.vue';
-import { useTicketPdf } from '@/composables/useTicketPdf';
+import QrcodeVue from 'qrcode.vue';
+import { usePaperizer } from 'paperizer';
 
 const isLoadingDiv = ref(true);
 const hasOrder = ref(false);
 const orders = ref([]);
+const isDownloading = ref(false);
 
 const primaryOrder = computed(() => orders.value?.[0] || null);
 const event = computed(() => primaryOrder.value?.event || null);
@@ -57,47 +57,17 @@ const qrValue = (detail) =>
         ie: detail.event_id
     });
 
-const ticketUnitPrice = (item, detail) => detail?.price ?? item?.price;
-
-const { isDownloading, downloadTicketsBySelector, buildPdfBlobFromElements } = useTicketPdf();
+const { paperize } = usePaperizer('myticket', {
+    styles: [`${styleURL}/ticket.css?v=20260808`],
+    windowTitle: 'Bilhetes Mticket'
+});
 
 const downloadTickets = async () => {
+    isDownloading.value = true;
     try {
-        await downloadTicketsBySelector('#myticket .ticket', event.value?.name || 'bilhetes');
-    } catch (error) {
-        console.error('Falha ao gerar o PDF do bilhete', error);
-    }
-};
-
-const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const emailTicketsIfNeeded = async () => {
-    if (!hasPhysicalTickets.value) return;
-
-    await nextTick();
-    await wait(400);
-
-    for (const item of physicalOrders.value) {
-        const cacheKey = `ticket-mail-sent:${item.id}`;
-        if (sessionStorage.getItem(cacheKey)) continue;
-
-        const ticketEls = document.querySelectorAll(`[data-sell-id="${item.id}"] .ticket`);
-        if (!ticketEls.length) continue;
-
-        try {
-            const blob = await buildPdfBlobFromElements(ticketEls);
-            if (!blob) continue;
-
-            const form = new FormData();
-            form.append('sell_id', String(item.id));
-            form.append('email', item.email || buyerEmail.value);
-            form.append('pdf', blob, 'ticket.pdf');
-
-            await axios.post(`${baseURL}/checkout/email-ticket`, form);
-            sessionStorage.setItem(cacheKey, '1');
-        } catch (error) {
-            console.error('Falha ao enviar o bilhete por email', error);
-        }
+        await paperize();
+    } finally {
+        isDownloading.value = false;
     }
 };
 
@@ -117,9 +87,8 @@ const getData = () => {
     }
 };
 
-onMounted(async () => {
+onMounted(() => {
     getData();
-    await emailTicketsIfNeeded();
 });
 </script>
 
@@ -275,19 +244,68 @@ onMounted(async () => {
                         </div>
 
                         <div id="myticket" class="tickets-print">
-                            <div v-for="item in physicalOrders" :key="item.id" class="order-group" :data-sell-id="item.id">
+                            <div v-for="item in physicalOrders" :key="item.id" class="order-group">
                                 <p class="order-group__label">Encomenda #{{ item.id }} · {{ item.ticket?.name || item.name }}</p>
 
-                                <div class="ticket-wrapper" v-for="detail in item.selldetails" :key="detail.id">
-                                    <DigitalTicket
-                                        :event="item.event"
-                                        :code="ticketNumber(detail)"
-                                        :qr-value="qrValue(detail)"
-                                        :type-name="item.ticket?.name"
-                                        :buyer-name="item.name"
-                                        :price="ticketUnitPrice(item, detail)"
-                                        status="valid"
-                                    />
+                                <div class="ticket" v-for="detail in item.selldetails" :key="detail.id">
+                                    <div class="left">
+                                        <div class="image" :style="`background-image: url(${storageURL}${item.event.image})`">
+                                            <p class="admit-one">
+                                                <span>Mticket</span>
+                                                <span>Mticket</span>
+                                                <span>Mticket</span>
+                                            </p>
+                                            <div class="ticket-number">
+                                                <p>{{ ticketNumber(detail) }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="ticket-info">
+                                            <p class="date">
+                                                <span>{{ moment(item.event.start_date).format('dddd') }}</span>
+                                                <span class="june-29">{{ moment(item.event.start_date).format('D') }} - {{ moment(item.event.start_date).format('MM') }}</span>
+                                                <span>{{ moment(item.event.start_date).format('YYYY') }}</span>
+                                            </p>
+                                            <div class="show-name">
+                                                <h1>{{ item.event.name }}</h1>
+                                                <h2>{{ item.name }}</h2>
+                                                <h2>{{ item.ticket?.name }}</h2>
+                                                <div class="cardticket">
+                                                    <p>{{ item.ticket?.description }}</p>
+                                                </div>
+                                            </div>
+                                            <div class="time">
+                                                <p>{{ moment(item.event.start_time, 'HH:mm:ss').format('HH:mm') }}</p>
+                                            </div>
+                                            <p class="location">
+                                                <span>{{ item.event.address }}</span>
+                                                <span class="separator"> </span>
+                                                <span>{{ item.event.province?.name }}, Moçambique</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="right">
+                                        <p class="admit-one">
+                                            <span>Mticket</span>
+                                            <span>Mticket</span>
+                                            <span>Mticket</span>
+                                        </p>
+                                        <div class="right-info-container">
+                                            <div class="show-name">
+                                                <h1>{{ item.event.name }}</h1>
+                                            </div>
+                                            <div class="time">
+                                                <p>
+                                                    {{ moment(item.event.start_time, 'HH:mm:ss').format('HH:mm') }}
+                                                    até
+                                                    {{ moment(item.event.end_time, 'HH:mm:ss').format('HH:mm') }}
+                                                </p>
+                                            </div>
+                                            <div class="barcode">
+                                                <qrcode-vue :value="qrValue(detail)" :size="100" level="H" render-as="svg" />
+                                            </div>
+                                            <p class="ticket-number">{{ ticketNumber(detail) }}</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -300,6 +318,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Staatliches&display=swap');
+
 .order-hero {
     background: linear-gradient(135deg, #0b3d91 0%, #1e6fe3 55%, #4f9cf8 100%);
     animation: hero-fade 0.6s ease-out;
@@ -454,16 +475,7 @@ onMounted(async () => {
 
 .tickets-print {
     overflow-x: auto;
-    padding: 1.15rem 0.85rem 1.35rem;
-    background: #ffffff;
-    border-radius: 1.25rem;
-    --ticket-page-bg: #f3f3f3;
-}
-
-.ticket-wrapper {
-    width: 100%;
-    max-width: 980px;
-    margin: 0 auto 1.1rem;
+    padding-bottom: 0.5rem;
 }
 
 @keyframes hero-fade {
@@ -491,5 +503,198 @@ onMounted(async () => {
         position: static;
     }
 }
-</style>
 
+/* Mesma proporção do ticket.css (ecrã = impressão) */
+.ticket {
+    width: max-content;
+    max-width: 100%;
+    height: 250px;
+    margin: 0 auto 12px;
+    display: flex;
+    background: white;
+    color: black;
+    font-family: 'Staatliches', cursive;
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    box-shadow: rgba(0, 0, 0, 0.3) 0px 19px 38px, rgba(0, 0, 0, 0.22) 0px 15px 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.left {
+    display: flex;
+    height: 250px;
+    flex: 1 1 auto;
+}
+
+.image {
+    position: relative;
+    height: 250px;
+    width: 250px;
+    flex: 0 0 250px;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0.85;
+}
+
+.admit-one {
+    position: absolute;
+    color: darkgray;
+    height: 250px;
+    padding: 0 10px;
+    letter-spacing: 0.15em;
+    display: flex;
+    text-align: center;
+    justify-content: space-around;
+    writing-mode: vertical-rl;
+    transform: rotate(-180deg);
+}
+
+.admit-one span:nth-child(2) {
+    color: white;
+    font-weight: 700;
+}
+
+.left .ticket-number {
+    height: 250px;
+    width: 250px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-end;
+    padding: 5px;
+}
+
+.ticket-info {
+    padding: 10px 30px;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: space-between;
+    align-items: center;
+    height: 250px;
+    box-sizing: border-box;
+    min-width: 280px;
+}
+
+.date {
+    border-top: 1px solid gray;
+    border-bottom: 1px solid gray;
+    padding: 5px 0;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+}
+
+.date span {
+    width: 100px;
+}
+
+.date span:first-child {
+    text-align: left;
+}
+
+.date span:last-child {
+    text-align: right;
+}
+
+.date .june-29 {
+    color: #d83565;
+    font-size: 20px;
+}
+
+.show-name {
+    font-size: 20px;
+    font-family: 'Open Sans', cursive;
+    color: #d83565;
+}
+
+.show-name h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    color: black;
+    margin: 0;
+}
+
+.show-name h2 {
+    margin: 0.35rem 0 0;
+    font-size: 1rem;
+}
+
+.time {
+    padding: 10px 0;
+    color: black;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-weight: 700;
+}
+
+.left .time {
+    font-size: 16px;
+}
+
+.location {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+    padding-top: 8px;
+    border-top: 1px solid gray;
+}
+
+.right {
+    position: relative;
+    width: 180px;
+    flex: 0 0 180px;
+    height: 250px;
+    border-left: 1px dashed #404040;
+}
+
+.right .admit-one {
+    color: darkgray;
+}
+
+.right .admit-one span:nth-child(2) {
+    color: gray;
+}
+
+.right .right-info-container {
+    height: 250px;
+    padding: 10px 10px 10px 35px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+}
+
+.right .show-name h1 {
+    font-size: 18px;
+}
+
+.barcode {
+    height: 100px;
+}
+
+.right .ticket-number {
+    color: gray;
+}
+
+.cardticket {
+    align-items: center;
+    padding: 10px 30px;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+    justify-content: space-between;
+    max-width: 50ch;
+}
+
+.cardticket p {
+    color: black;
+    margin: 0;
+}
+</style>

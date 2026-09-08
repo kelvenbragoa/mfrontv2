@@ -166,7 +166,7 @@ onMounted(() => {
             <div class="home-hero__content px-4 lg:px-8 mx-0 lg:mx-8">
                 <p class="home-hero__brand">MTICKET</p>
                 <h1 class="home-hero__title">Bilhetes para o que importa</h1>
-                <p class="home-hero__subtitle">Descobre shows, teatros e experiências em Moçambique — e garante o teu lugar.</p>
+                <p class="home-hero__subtitle">Descobre shows, teatros e experiências em Moçambique e garante o teu lugar.</p>
                 <div class="home-hero__actions">
                     <Button label="Explorar eventos" class="p-button-rounded border-none font-medium text-white bg-blue-500" @click="scrollToEvents" />
                     <router-link to="/ser-promotor">

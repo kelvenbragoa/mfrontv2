@@ -1,12 +1,13 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { baseURL, storageURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { debounce } from 'lodash';
-import QrcodeVue from 'qrcode.vue';
+import DigitalTicket from '@/components/ticket/DigitalTicket.vue';
+import { useTicketPdf } from '@/composables/useTicketPdf';
 
 const router = useRouter();
 const toast = useToast();
@@ -24,6 +25,9 @@ const first = ref(0);
 
 const showTicketDialog = ref(false);
 const selectedTicket = ref(null);
+const captureTicket = ref(null);
+const downloadingId = ref(null);
+const { isDownloading, downloadTicketElements } = useTicketPdf();
 
 const statusOptions = [
     { label: 'Próximos', value: 'upcoming' },
@@ -36,8 +40,10 @@ const hasTickets = computed(() => ticketsList.value.length > 0);
 const hasActiveFilters = computed(() => !!(searchQuery.value?.trim() || selectedStatus.value));
 const showPagination = computed(() => (tickets.value?.last_page || 0) > 1);
 
+const isTicketUsed = (ticket) => Number(ticket?.status) === 0 || Boolean(ticket?.verified_at);
+
 const resolveStatus = (ticket) => {
-    if (Number(ticket.status) === 1) {
+    if (isTicketUsed(ticket)) {
         return { label: 'Usado', severity: 'info', key: 'used' };
     }
     if (ticket.event?.end_date && moment().isAfter(moment(ticket.event.end_date).endOf('day'))) {
@@ -84,6 +90,44 @@ const qrValue = (ticket) =>
 const openTicket = (ticket) => {
     selectedTicket.value = ticket;
     showTicketDialog.value = true;
+};
+
+const ticketBuyerName = (ticket) => {
+    if (ticket?.sell?.name) return ticket.sell.name;
+    try {
+        return JSON.parse(localStorage.getItem('user') || '{}')?.name || 'Cliente';
+    } catch {
+        return 'Cliente';
+    }
+};
+
+const ticketStatusKey = (ticket) => {
+    const key = resolveStatus(ticket).key;
+    if (key === 'used' || key === 'expired') return key;
+    return 'valid';
+};
+
+const downloadPhysicalTicket = async (ticket) => {
+    if (!ticket || isLiveTicket(ticket)) return;
+    downloadingId.value = ticket.id;
+    captureTicket.value = ticket;
+    try {
+        await nextTick();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const el = document.querySelector('#ticket-pdf-source .ticket');
+        if (!el) throw new Error('ticket element missing');
+        await downloadTicketElements([el], ticket.event?.name || ticketNumber(ticket));
+    } catch {
+        toast.add({
+            severity: 'error',
+            summary: 'Não foi possível baixar o bilhete',
+            detail: 'Tenta novamente dentro de momentos.',
+            life: 4000
+        });
+    } finally {
+        captureTicket.value = null;
+        downloadingId.value = null;
+    }
 };
 
 const getData = async (page = 1) => {
@@ -306,6 +350,15 @@ onMounted(() => {
                                         class="p-button-rounded p-button-outlined"
                                         @click="openTicket(ticket)"
                                     />
+                                    <Button
+                                        v-if="!isLiveTicket(ticket)"
+                                        label="Baixar"
+                                        icon="pi pi-download"
+                                        class="p-button-rounded p-button-outlined"
+                                        :loading="downloadingId === ticket.id"
+                                        :disabled="isDownloading"
+                                        @click="downloadPhysicalTicket(ticket)"
+                                    />
                                     <router-link v-if="ticket.event?.slug" :to="'/eventos/' + ticket.event.slug">
                                         <Button label="Evento" class="p-button-rounded p-button-outlined" />
                                     </router-link>
@@ -356,8 +409,8 @@ onMounted(() => {
         v-model:visible="showTicketDialog"
         modal
         :header="selectedTicket?.event?.name || 'Bilhete'"
-        :style="{ width: 'min(92vw, 28rem)' }"
-        :breakpoints="{ '960px': '90vw' }"
+        :style="{ width: 'min(96vw, 1040px)' }"
+        :breakpoints="{ '960px': '96vw' }"
     >
         <div v-if="selectedTicket" class="qr-dialog">
             <template v-if="isLiveTicket(selectedTicket)">
@@ -380,32 +433,42 @@ onMounted(() => {
                 </Message>
             </template>
             <template v-else>
-            <Tag :value="resolveStatus(selectedTicket).label" :severity="resolveStatus(selectedTicket).severity" class="mb-3" />
-            <div class="qr-dialog__code">
-                <qrcode-vue :value="qrValue(selectedTicket)" :size="180" level="H" render-as="svg" />
-            </div>
-            <p class="qr-dialog__id">{{ ticketNumber(selectedTicket) }}</p>
-            <p class="qr-dialog__type">{{ selectedTicket.ticket?.name }}</p>
-            <p class="qr-dialog__meta">
-                <span v-if="selectedTicket.event?.start_date">
-                    {{ moment(selectedTicket.event.start_date).format('LL') }}
-                </span>
-                <span v-if="selectedTicket.event"> · {{ eventLocation(selectedTicket.event) }}</span>
-            </p>
-            <Message
-                v-if="resolveStatus(selectedTicket).key === 'upcoming'"
-                severity="info"
-                :closable="false"
-                class="w-full mt-3"
-            >
-                Apresenta este QR Code na entrada do evento.
-            </Message>
-            <Message v-else severity="warn" :closable="false" class="w-full mt-3">
-                Este bilhete já não está válido para entrada.
-            </Message>
+                <div class="dialog-ticket">
+                    <DigitalTicket
+                        :event="selectedTicket.event"
+                        :code="ticketNumber(selectedTicket)"
+                        :qr-value="qrValue(selectedTicket)"
+                        :type-name="selectedTicket.ticket?.name"
+                        :buyer-name="ticketBuyerName(selectedTicket)"
+                        :price="selectedTicket.sell?.price"
+                        :status="ticketStatusKey(selectedTicket)"
+                    />
+                </div>
+                <div class="flex justify-content-end mt-3">
+                    <Button
+                        label="Baixar PDF"
+                        icon="pi pi-download"
+                        class="p-button-rounded border-none font-medium text-white bg-blue-500"
+                        :loading="downloadingId === selectedTicket.id"
+                        :disabled="isDownloading"
+                        @click="downloadPhysicalTicket(selectedTicket)"
+                    />
+                </div>
             </template>
         </div>
     </Dialog>
+
+    <div v-if="captureTicket" id="ticket-pdf-source" class="ticket-pdf-source" aria-hidden="true">
+        <DigitalTicket
+            :event="captureTicket.event"
+            :code="ticketNumber(captureTicket)"
+            :qr-value="qrValue(captureTicket)"
+            :type-name="captureTicket.ticket?.name"
+            :buyer-name="ticketBuyerName(captureTicket)"
+            :price="captureTicket.sell?.price"
+            :status="ticketStatusKey(captureTicket)"
+        />
+    </div>
 </template>
 
 <style scoped>
@@ -544,6 +607,22 @@ onMounted(() => {
 
 .qr-dialog {
     text-align: center;
+}
+
+.dialog-ticket {
+    text-align: left;
+    padding: 0.75rem;
+    background: #eaf3f9;
+    border-radius: 1.25rem;
+}
+
+.ticket-pdf-source {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 980px;
+    z-index: -1;
+    pointer-events: none;
 }
 
 .qr-dialog__code {
