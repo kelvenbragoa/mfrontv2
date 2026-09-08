@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import moment from 'moment';
 import QrcodeVue from 'qrcode.vue';
-import { storageURL, baseURL } from '@/service/ApiConstant';
+import { storageURL } from '@/service/ApiConstant';
 
 const props = defineProps({
     event: { type: Object, default: null },
@@ -25,28 +25,14 @@ const normalizeTicketStatus = (status) => {
 
 const PT_MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
-const mediaUrl = (value) => {
-    if (!value) return '';
-    if (value.startsWith('data:') || value.startsWith('blob:')) return value;
-    let path = value;
-    if (value.startsWith('http://') || value.startsWith('https://')) {
-        const marker = '/storage/';
-        const idx = value.indexOf(marker);
-        if (idx === -1) return value;
-        path = value.slice(idx + marker.length);
-    }
-    path = String(path).replace(/^\/+/, '');
-    return `${baseURL}/media/${path.split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;
-};
-
 const imageSrc = computed(() => {
     if (props.image) {
-        return props.image.startsWith('data:') || props.image.startsWith('blob:')
+        return props.image.startsWith('http') || props.image.startsWith('data:') || props.image.startsWith('blob:')
             ? props.image
-            : mediaUrl(props.image.startsWith('http') ? props.image : storageURL + props.image);
+            : storageURL + props.image;
     }
     if (!props.event?.image) return '';
-    return mediaUrl(storageURL + props.event.image);
+    return storageURL + props.event.image;
 });
 
 const eventImageStyle = computed(() => {

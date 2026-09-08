@@ -225,7 +225,7 @@ app.component('VirtualScroller', VirtualScroller);
 
 app.config.globalProperties.$axios = axios;
 axios.defaults.withCredentials = true;
-axios.defaults.withXSRFToken = true;
+axios.defaults.withXSRFToken = false;
 axios.interceptors.request.use((config) => {
     config.headers.Accept = 'application/json';
     const token = localStorage.getItem('token');
