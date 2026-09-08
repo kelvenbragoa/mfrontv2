@@ -45,7 +45,8 @@ const fetchAsDataUrl = async (src) => {
     const path = storagePathFromUrl(src);
     const candidates = [];
     if (path) {
-        candidates.push(`${baseURL}/media/${path}`);
+        const encoded = path.split('/').filter(Boolean).map(encodeURIComponent).join('/');
+        candidates.push(`${baseURL}/media/${encoded}`);
         candidates.push(`/storage/${path}`);
     }
     candidates.push(src);
