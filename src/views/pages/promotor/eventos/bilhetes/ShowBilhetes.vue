@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { baseURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
+import TicketBatchesCard from '@/components/tickets/TicketBatchesCard.vue';
 
 const router = useRouter();
 const toast = useToast();
@@ -198,6 +199,12 @@ const deleteField = async (field) => {
     }
 };
 
+const onStockUpdated = (qty) => {
+    if (ticket.value) {
+        ticket.value.available_quantity = qty;
+    }
+};
+
 onMounted(() => {
     loadData();
 });
@@ -221,7 +228,10 @@ onMounted(() => {
                 <div class="col-12 md:col-6">
                     <p class="mb-2"><strong>Descrição:</strong> {{ ticket.description || '—' }}</p>
                     <p class="mb-2"><strong>Preço:</strong> {{ ticket.price }} MT</p>
-                    <p class="mb-2"><strong>Stock (max_qtd):</strong> {{ ticket.max_qtd }}</p>
+                    <p class="mb-2">
+                        <strong>Stock:</strong>
+                        {{ ticket.available_quantity ?? '—' }} disponíveis / {{ ticket.max_qtd }}
+                    </p>
                     <p class="mb-0">
                         <strong>Máx. por compra:</strong>
                         {{ ticket.max_per_order || '5 (padrão)' }}
@@ -240,6 +250,8 @@ onMounted(() => {
                 </div>
             </div>
         </div>
+
+        <TicketBatchesCard :ticket="ticket" @stock-updated="onStockUpdated" />
 
         <div class="card">
             <div class="flex flex-wrap align-items-center justify-content-between gap-2 mb-3">

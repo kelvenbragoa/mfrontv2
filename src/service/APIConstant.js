@@ -7,10 +7,10 @@ import { useRouter } from 'vue-router';
 // export const styleURL = 'http://127.0.0.1:8000';
 // export const storageURL = 'http://127.0.0.1:8000/storage/';
 
-// export const baseURL2 = 'http://10.17.47.193:8000';
-// export const baseURL = 'http://10.17.47.193:8000/api';
-// export const styleURL = 'http://10.17.47.193:8000';
-// export const storageURL = 'http://10.17.47.193:8000/storage/';
+// export const baseURL2 = 'http://10.45.64.193:8000';
+// export const baseURL = 'http://10.45.64.193:8000/api';
+// export const styleURL = 'http://10.45.64.193:8000';
+// export const storageURL = 'http://10.45.64.193:8000/storage/';
 
 
 export const baseURL2 = 'https://backend.mticket.co.mz';

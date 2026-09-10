@@ -119,13 +119,13 @@ const inlineTicketImages = async (root) => {
     );
 };
 
-const captureTicketEl = async (ticketEl) => {
+const captureTicketEl = async (ticketEl, scale = 3) => {
     await inlineTicketImages(ticketEl);
     ticketEl.classList.add('exporting');
     try {
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
         return await html2canvas(ticketEl, {
-            scale: 3,
+            scale,
             backgroundColor: '#ffffff',
             useCORS: true,
             logging: false,
@@ -143,11 +143,11 @@ const captureTicketEl = async (ticketEl) => {
 
 const safeFileName = (name) => (name || 'bilhete').replace(/[\\/:*?"<>|]+/g, '').trim() || 'bilhete';
 
-const addTicketPage = (pdf, canvas) => {
-    const pageWidth = (canvas.width / 3) * PX_TO_MM;
-    const pageHeight = (canvas.height / 3) * PX_TO_MM;
+const addTicketPage = (pdf, canvas, scale = 3) => {
+    const shot = asImageShot(canvas);
+    const pageWidth = (shot.width / scale) * PX_TO_MM;
+    const pageHeight = (shot.height / scale) * PX_TO_MM;
     const orientation = pageWidth >= pageHeight ? 'l' : 'p';
-    const image = canvas.toDataURL('image/jpeg', 0.92);
 
     if (!pdf) {
         pdf = new jsPDF({
@@ -160,8 +160,66 @@ const addTicketPage = (pdf, canvas) => {
         pdf.addPage([pageWidth, pageHeight], orientation);
     }
 
-    pdf.addImage(image, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+    pdf.addImage(shot.data, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
 
+    return pdf;
+};
+
+const asImageShot = (item) => {
+    if (item?.data && item.width) {
+        return item;
+    }
+    return {
+        data: item.toDataURL('image/jpeg', 0.88),
+        width: item.width,
+        height: item.height
+    };
+};
+
+const A4_W = 210;
+const A4_H = 297;
+
+const buildA4Pdf = (canvases, scale = 2) => {
+    const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
+    const margin = 8;
+    const gap = 3;
+    const usableW = A4_W - margin * 2;
+    const usableH = A4_H - margin * 2;
+    const slotH = (usableH - gap * 3) / 4;
+
+    canvases.forEach((canvas, index) => {
+        const shot = asImageShot(canvas);
+        const slot = index % 4;
+        if (index > 0 && slot === 0) {
+            pdf.addPage('a4', 'p');
+        }
+
+        const ratio = shot.width / shot.height;
+        let w = usableW;
+        let h = w / ratio;
+        if (h > slotH) {
+            h = slotH;
+            w = h * ratio;
+        }
+
+        const x = margin + (usableW - w) / 2;
+        const y = margin + slot * (slotH + gap);
+        pdf.addImage(shot.data, 'JPEG', x, y, w, h, undefined, 'FAST');
+    });
+
+    return pdf;
+};
+
+const buildLayoutPdf = (canvases, layout = 'boca', scale = 3) => {
+    if (!canvases.length) return null;
+    if (layout === 'a4') {
+        return buildA4Pdf(canvases, scale);
+    }
+
+    let pdf = null;
+    canvases.forEach((canvas) => {
+        pdf = addTicketPage(pdf, canvas, scale);
+    });
     return pdf;
 };
 
@@ -177,7 +235,7 @@ export function useTicketPdf() {
             let pdf = null;
 
             for (const ticketEl of tickets) {
-                pdf = addTicketPage(pdf, await captureTicketEl(ticketEl));
+                pdf = addTicketPage(pdf, await captureTicketEl(ticketEl, 3), 3);
             }
 
             pdf?.save(`MTicket-${safeFileName(fileName)}.pdf`);
@@ -193,7 +251,7 @@ export function useTicketPdf() {
         let pdf = null;
 
         for (const ticketEl of tickets) {
-            pdf = addTicketPage(pdf, await captureTicketEl(ticketEl));
+            pdf = addTicketPage(pdf, await captureTicketEl(ticketEl, 3), 3);
         }
 
         return pdf ? pdf.output('blob') : null;
@@ -207,6 +265,8 @@ export function useTicketPdf() {
         isDownloading,
         downloadTicketElements,
         downloadTicketsBySelector,
-        buildPdfBlobFromElements
+        buildPdfBlobFromElements,
+        captureTicketEl,
+        buildLayoutPdf
     };
 }

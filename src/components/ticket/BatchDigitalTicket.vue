@@ -14,16 +14,8 @@ const props = defineProps({
     typeName: { type: String, default: '—' },
     buyerName: { type: String, default: '—' },
     price: { type: [String, Number], default: 0 },
-    status: { type: [String, Number], default: 'valid' }
+    batchNumber: { type: [String, Number], default: '' }
 });
-
-const normalizeTicketStatus = (status) => {
-    const key = status === 0 || status === '0' ? 'used' : String(status ?? 'valid').toLowerCase();
-    if (key === 'used' || key === 'expired' || key === 'cancelled' || key === 'canceled') {
-        return key === 'canceled' ? 'cancelled' : key;
-    }
-    return 'valid';
-};
 
 const PT_MONTHS = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
@@ -67,12 +59,10 @@ const formatMoney = (value) =>
         ? value
         : `${Number(value || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} MT`;
 
-const statusMeta = computed(() => {
-    const key = normalizeTicketStatus(props.status);
-    if (key === 'used') return { label: 'BILHETE UTILIZADO', className: 'used' };
-    if (key === 'expired') return { label: 'BILHETE EXPIRADO', className: 'expired' };
-    if (key === 'cancelled') return { label: 'BILHETE CANCELADO', className: 'cancelled' };
-    return { label: 'BILHETE VÁLIDO', className: '' };
+const loteLabel = computed(() => {
+    const n = props.batchNumber;
+    if (n === null || n === undefined || n === '') return '—';
+    return String(n).startsWith('#') ? String(n) : `#${n}`;
 });
 </script>
 
@@ -119,18 +109,15 @@ const statusMeta = computed(() => {
                     <div class="info-value">{{ typeName || '—' }}</div>
                 </div>
                 <div class="info-item">
-                    <div class="info-label">👤 Comprador</div>
                     <div class="info-value">{{ buyerName || '—' }}</div>
                 </div>
                 <div class="info-item">
-                    <div class="info-label">💰 Preço</div>
+                    <div class="info-label">Preço</div>
                     <div class="info-value">{{ formatMoney(price) }}</div>
                 </div>
                 <div class="info-item">
-                    <span class="status-badge" :class="statusMeta.className">
-                        <span class="status-dot"></span>
-                        {{ statusMeta.label }}
-                    </span>
+                    <div class="info-label">Lote</div>
+                    <div class="info-value">{{ loteLabel }}</div>
                 </div>
             </div>
         </div>
@@ -147,7 +134,7 @@ const statusMeta = computed(() => {
                 <qrcode-vue :value="qrValue" :size="132" level="H" render-as="svg" />
             </div>
             <div class="qr-instruction">APONTE O QR CODE NA ENTRADA</div>
-            <div class="qr-subtext">Bilhete digital<br />Apresente o QR Code na entrada</div>
+            <div class="qr-subtext">Bilhete físico<br />Apresente o QR Code na entrada</div>
         </div>
     </article>
 </template>
@@ -349,37 +336,6 @@ const statusMeta = computed(() => {
     grid-column: 1 / -1;
 }
 
-.status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    width: fit-content;
-    padding: 7px 14px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 700;
-    background: #e7f8ee;
-    color: #159a52;
-}
-
-.status-badge .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: currentColor;
-}
-
-.status-badge.used {
-    background: #efefef;
-    color: #6b7280;
-}
-
-.status-badge.expired,
-.status-badge.cancelled {
-    background: #fdebeb;
-    color: #d94141;
-}
-
 .ticket-qr {
     flex: 0 0 24%;
     background-image: linear-gradient(160deg, var(--mt-blue) 0%, var(--mt-blue-dark) 100%);
@@ -430,37 +386,6 @@ const statusMeta = computed(() => {
     font-size: 11px;
     opacity: 0.85;
     line-height: 1.4;
-}
-
-@media (max-width: 800px) {
-    .ticket {
-        flex-direction: column;
-    }
-
-    .ticket-image {
-        flex: 0 0 220px;
-        min-height: 220px;
-    }
-
-    .ticket-info {
-        padding: 26px 24px;
-    }
-
-    .ticket-qr {
-        flex: 1 1 auto;
-        padding: 30px 24px;
-    }
-
-    .dashed-divider,
-    .perforation {
-        display: none;
-    }
-}
-
-@media (max-width: 480px) {
-    .info-grid {
-        grid-template-columns: 1fr;
-    }
 }
 
 .ticket.exporting {
