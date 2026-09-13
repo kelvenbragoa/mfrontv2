@@ -161,9 +161,9 @@ onMounted(() => getData(1));
 <template>
     <div v-if="isLoading" class="promotor-page px-4 lg:px-8 mx-0 lg:mx-8 py-4">
         <Skeleton height="14rem" class="mb-4 border-round-xl" />
-        <div class="flex align-items-end gap-3 mb-5" style="margin-top: -3rem">
-            <Skeleton shape="circle" size="6rem" />
-            <div class="flex-1">
+        <div class="flex align-items-start gap-3 mb-5">
+            <Skeleton shape="circle" size="6rem" class="promotor-skel-avatar" />
+            <div class="flex-1 pt-2">
                 <Skeleton width="40%" height="1.75rem" class="mb-2" />
                 <Skeleton width="60%" height="1rem" />
             </div>
@@ -319,7 +319,7 @@ onMounted(() => getData(1));
 .promotor-hero__banner--default {
     background-size: contain;
     background-repeat: no-repeat;
-    background-color: #000;
+    background-color: #0f172a;
 }
 
 .promotor-hero__banner-img {
@@ -338,15 +338,16 @@ onMounted(() => getData(1));
 
 .promotor-hero__content {
     position: relative;
-    margin-top: -3.5rem;
+    z-index: 1;
+    padding-top: 0.25rem;
     padding-bottom: 1.5rem;
 }
 
 .promotor-identity {
     display: flex;
     flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 1.25rem;
+    align-items: flex-start;
+    gap: 1.25rem 1.5rem;
 }
 
 .promotor-avatar {
@@ -355,6 +356,7 @@ onMounted(() => getData(1));
     justify-content: center;
     width: 7rem;
     height: 7rem;
+    margin-top: -3.5rem;
     border-radius: 999px;
     overflow: hidden;
     border: 4px solid #fff;
@@ -374,8 +376,12 @@ onMounted(() => getData(1));
 
 .promotor-identity__text {
     flex: 1;
-    min-width: 12rem;
-    padding-bottom: 0.35rem;
+    min-width: min(100%, 14rem);
+    padding-top: 0.35rem;
+}
+
+.promotor-skel-avatar {
+    margin-top: -3rem;
 }
 
 .promotor-eyebrow {
