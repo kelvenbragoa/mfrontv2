@@ -23,6 +23,7 @@ const bars = ref([]);
 const protocols = ref([]);
 const barmans = ref([]);
 const products = ref([]);
+const shopProducts = ref([]);
 const lineups = ref([]);
 const imageBroken = ref(false);
 
@@ -51,7 +52,8 @@ const collections = {
     invite: invites,
     bar: bars,
     lineup: lineups,
-    product: products
+    product: products,
+    shop: shopProducts
 };
 
 const deleteEndpoints = {
@@ -60,7 +62,8 @@ const deleteEndpoints = {
     invite: 'promotor-invites',
     bar: 'promotor-bar',
     lineup: 'promotor-lineups',
-    product: 'promotor-products'
+    product: 'promotor-products',
+    shop: 'promotor-shop-products'
 };
 
 const deleteLabels = {
@@ -69,7 +72,8 @@ const deleteLabels = {
     invite: 'convite',
     bar: 'bar',
     lineup: 'artista do line-up',
-    product: 'produto'
+    product: 'produto',
+    shop: 'produto da loja'
 };
 
 const getData = async ({ silent = false } = {}) => {
@@ -97,6 +101,7 @@ const getData = async ({ silent = false } = {}) => {
         barmans.value = data.barmans ?? [];
         lineups.value = data.lineup ?? [];
         products.value = data.products ?? [];
+        shopProducts.value = data.shop_products ?? [];
         loadError.value = null;
     } catch (error) {
         const status = error?.response?.status;
@@ -122,6 +127,19 @@ const formatCurrency = (value) =>
 const formatDate = (value) => (value ? moment(value).format('DD/MM/YYYY') : '--');
 
 const formatTime = (value) => (value ? moment(value, 'HH:mm:ss').format('HH:mm') : '--');
+
+const shopStock = (row) => {
+    const variants = row.variants || [];
+    if (variants.length) {
+        return variants.reduce((sum, item) => sum + Number(item.qtd || 0), 0);
+    }
+    return Number(row.qtd || 0);
+};
+
+const shopVariantLabel = (row) => {
+    const variants = row.variants || [];
+    return variants.length ? variants.map((item) => item.name).join(', ') : '—';
+};
 
 const dateTime = (date, time) => `${formatDate(date)}${time ? ` às ${formatTime(time)}` : ''}`;
 
@@ -599,6 +617,54 @@ onMounted(() => {
                             </Column>
                         </DataTable>
                         <p v-else class="tab-empty">Sem produtos registados.</p>
+                    </TabPanel>
+
+                    <TabPanel :header="`Loja (${shopProducts.length})`">
+                        <div class="tab-toolbar">
+                            <router-link :to="`/admin/eventos/${event.id}/loja/create`">
+                                <Button label="Adicionar produto" icon="pi pi-plus" size="small" />
+                            </router-link>
+                        </div>
+                        <p class="text-600 mt-0 mb-3">Camisolas, bonés e merch para pagar online e levantar no evento.</p>
+
+                        <DataTable v-if="shopProducts.length" :value="shopProducts" responsiveLayout="scroll" class="p-datatable-sm">
+                            <Column field="name" header="Nome" sortable />
+                            <Column header="Preço" sortable field="sell_price">
+                                <template #body="slotProps">{{ formatCurrency(slotProps.data.sell_price) }}</template>
+                            </Column>
+                            <Column header="Stock">
+                                <template #body="slotProps">{{ shopStock(slotProps.data) }}</template>
+                            </Column>
+                            <Column header="Variantes">
+                                <template #body="slotProps">{{ shopVariantLabel(slotProps.data) }}</template>
+                            </Column>
+                            <Column header="Estado">
+                                <template #body="slotProps">
+                                    <Tag :value="Number(slotProps.data.status) === 1 ? 'Activo' : 'Oculto'" :severity="Number(slotProps.data.status) === 1 ? 'success' : 'secondary'" />
+                                </template>
+                            </Column>
+                            <Column header="Ações" style="width: 9rem">
+                                <template #body="slotProps">
+                                    <div class="flex gap-1">
+                                        <router-link :to="`/admin/eventos/${event.id}/loja/${slotProps.data.id}`">
+                                            <Button icon="pi pi-eye" text rounded severity="secondary" v-tooltip.top="'Ver'" />
+                                        </router-link>
+                                        <router-link :to="`/admin/eventos/${event.id}/loja/${slotProps.data.id}/edit`">
+                                            <Button icon="pi pi-pencil" text rounded severity="secondary" v-tooltip.top="'Editar'" />
+                                        </router-link>
+                                        <Button
+                                            icon="pi pi-trash"
+                                            text
+                                            rounded
+                                            severity="danger"
+                                            v-tooltip.top="'Eliminar'"
+                                            @click="askDelete('shop', slotProps.data)"
+                                        />
+                                    </div>
+                                </template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">Ainda não há produtos na loja deste evento.</p>
                     </TabPanel>
 
                     <TabPanel :header="`Protocolos (${protocols.length})`">

@@ -28,6 +28,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
     const brokenImage = ref(false);
     const loadingPdfProducts = ref(false);
     const loadingPdfTickets = ref(false);
+    const loadingPdfShop = ref(false);
 
     const getData = async ({ silent = false } = {}) => {
         if (silent) isRefreshing.value = true;
@@ -92,6 +93,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
     );
 
     const barRevenue = computed(() => Number(dashboard.value?.totalamount || 0));
+    const shopRevenue = computed(() => Number(dashboard.value?.shop_revenue || 0));
 
     const invitesSent = computed(() =>
         (eventData.value?.invites || []).reduce((sum, invite) => sum + (invite.customers?.length || 0), 0)
@@ -101,6 +103,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         { key: 'ticket-revenue', label: 'Receita bilhetes', value: formatCurrency(ticketRevenue.value), icon: 'pi pi-wallet', tone: 'blue' },
         { key: 'tickets-sold', label: 'Bilhetes vendidos', value: formatNumber(ticketsSold.value), icon: 'pi pi-ticket', tone: 'green' },
         { key: 'bar-revenue', label: 'Receita bar', value: formatCurrency(barRevenue.value), icon: 'pi pi-shopping-bag', tone: 'purple' },
+        { key: 'shop-revenue', label: 'Receita loja', value: formatCurrency(shopRevenue.value), icon: 'pi pi-shopping-cart', tone: 'teal' },
         { key: 'invites', label: 'Convites enviados', value: formatNumber(invitesSent.value), icon: 'pi pi-envelope', tone: 'orange' }
     ]);
 
@@ -110,6 +113,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         { key: 'invites', label: 'Convites', value: dashboard.value?.invites ?? 0, icon: 'pi pi-envelope', tone: 'orange', to: `${dashboardPath}/convites` },
         { key: 'lineups', label: 'Line-up', value: dashboard.value?.lineups ?? 0, icon: 'pi pi-users', tone: 'purple', to: `${dashboardPath}/lineups` },
         { key: 'bars', label: 'Bares', value: dashboard.value?.bars ?? 0, icon: 'pi pi-building', tone: 'cyan', to: basePath },
+        { key: 'shop', label: 'Loja', value: dashboard.value?.shop ?? 0, icon: 'pi pi-shopping-cart', tone: 'teal', to: `${dashboardPath}/loja` },
         { key: 'products', label: 'Produtos', value: dashboard.value?.products ?? 0, icon: 'pi pi-tag', tone: 'indigo', to: basePath },
         { key: 'protocols', label: 'Protocolos', value: dashboard.value?.protocols ?? 0, icon: 'pi pi-id-card', tone: 'slate', to: basePath },
         { key: 'barmans', label: 'Barmans', value: dashboard.value?.barmans ?? 0, icon: 'pi pi-user', tone: 'rose', to: basePath }
@@ -129,6 +133,10 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         (eventData.value?.products || []).filter((row) => matchesSearch(row.name) || matchesSearch(row.barstore?.name))
     );
 
+    const filteredShopProducts = computed(() =>
+        (eventData.value?.shop_products || []).filter((row) => matchesSearch(row.name) || matchesSearch(row.description))
+    );
+
     const filteredInvites = computed(() =>
         (eventData.value?.invites || []).filter((row) => matchesSearch(row.name) || matchesSearch(row.description))
     );
@@ -143,23 +151,29 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
     const barSoldQty = (bar) => (bar.sells || []).reduce((sum, item) => sum + Number(item.qtd || 0), 0);
     const barSoldValue = (bar) => (bar.sells || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
     const ticketSoldQty = (ticket) => (ticket.sells || []).reduce((sum, item) => sum + Number(item.qty || 0), 0);
+    const shopSoldQty = (product) => Number(product.sold_qtd || 0);
+    const shopSoldValue = (product) => Number(product.sold_value || 0);
 
     const hasActiveFilters = computed(() => !!searchQuery.value?.trim());
     const clearFilters = () => { searchQuery.value = ''; };
 
     const downloadPDF = async (type) => {
-        const isProducts = type === 'products';
-        const loadingRef = isProducts ? loadingPdfProducts : loadingPdfTickets;
-        loadingRef.value = true;
+        const reportMap = {
+            products: { loading: loadingPdfProducts, path: 'products', file: `barreport${eventId}.pdf` },
+            tickets: { loading: loadingPdfTickets, path: 'tickets', file: `ticketreport${eventId}.pdf` },
+            shop: { loading: loadingPdfShop, path: 'shop', file: `shopreport${eventId}.pdf` }
+        };
+        const report = reportMap[type] || reportMap.tickets;
+        report.loading.value = true;
 
         try {
-            const response = await axios.get(`${baseURL}/download-report/${eventId}/${isProducts ? 'products' : 'tickets'}`, {
+            const response = await axios.get(`${baseURL}/download-report/${eventId}/${report.path}`, {
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `${isProducts ? 'barreport' : 'ticketreport'}${eventId}.pdf`);
+            link.setAttribute('download', report.file);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -168,7 +182,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         } catch {
             toast.add({ severity: 'error', summary: 'Erro', detail: 'Não foi possível descarregar o relatório.', life: 4000 });
         } finally {
-            loadingRef.value = false;
+            report.loading.value = false;
         }
     };
 
@@ -184,14 +198,17 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         brokenImage,
         loadingPdfProducts,
         loadingPdfTickets,
+        loadingPdfShop,
         eventData,
         eventImage,
         currentStatus,
         barRevenue,
+        shopRevenue,
         kpis,
         summaryCards,
         filteredTickets,
         filteredProducts,
+        filteredShopProducts,
         filteredInvites,
         filteredBars,
         hasActiveFilters,
@@ -204,6 +221,8 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         barSoldQty,
         barSoldValue,
         ticketSoldQty,
+        shopSoldQty,
+        shopSoldValue,
         goBack,
         getData,
         clearFilters,

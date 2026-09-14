@@ -367,6 +367,30 @@ const router = createRouter({
                     },
                     component: () => import('@/views/pages/admin/eventos/produtos/ShowProdutos.vue')
                 },
+                {
+                    path: '/admin/eventos/:id/loja/create',
+                    name: 'admin.eventos.show.loja.create',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/components/shop/ShopProductForm.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/loja/:idproduto/edit',
+                    name: 'admin.eventos.show.loja.edit',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/components/shop/ShopProductForm.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/loja/:idproduto',
+                    name: 'admin.eventos.show.loja.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/components/shop/ShopProductShow.vue')
+                },
 
                 //profile
                 {
@@ -430,6 +454,14 @@ const router = createRouter({
                         requiresAuth: true
                     },
                     component: () => import('@/views/pages/admin/eventos/dashboard/lineups/IndexDashboardLineups.vue')
+                },
+                {
+                    path: '/admin/eventos/:id/dashboard/loja',
+                    name: 'admin.eventos.dashboard.loja',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/dashboard/loja/IndexDashboardLoja.vue')
                 },
             ]
         },
@@ -726,6 +758,30 @@ const router = createRouter({
                     },
                     component: () => import('@/views/pages/promotor/eventos/produtos/ShowProdutos.vue')
                 },
+                {
+                    path: '/promotor/eventos/:id/loja/create',
+                    name: 'promotor.eventos.show.loja.create',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/components/shop/ShopProductForm.vue')
+                },
+                {
+                    path: '/promotor/eventos/:id/loja/:idproduto/edit',
+                    name: 'promotor.eventos.show.loja.edit',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/components/shop/ShopProductForm.vue')
+                },
+                {
+                    path: '/promotor/eventos/:id/loja/:idproduto',
+                    name: 'promotor.eventos.show.loja.show',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/components/shop/ShopProductShow.vue')
+                },
 
                 //profile
                 {
@@ -790,6 +846,14 @@ const router = createRouter({
                     },
                     component: () => import('@/views/pages/promotor/eventos/dashboard/lineups/IndexDashboardLineups.vue')
                 },
+                {
+                    path: '/promotor/eventos/:id/dashboard/loja',
+                    name: 'promotor.eventos.dashboard.loja',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/dashboard/loja/IndexDashboardLoja.vue')
+                },
             ]
         },
         {
@@ -834,6 +898,16 @@ const router = createRouter({
                     path: '/checkout/:id/evento',
                     name: 'checkout',
                     component: () => import('@/views/pages/home/events/checkout.vue')
+                },
+                {
+                    path: '/loja/:id/checkout',
+                    name: 'checkout.loja',
+                    component: () => import('@/views/pages/home/events/shopCheckout.vue')
+                },
+                {
+                    path: '/encomenda-loja',
+                    name: 'encomenda.loja',
+                    component: () => import('@/views/pages/home/events/shopOrder.vue')
                 },
                 {
                     path: '/encomenda',

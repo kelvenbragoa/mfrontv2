@@ -59,6 +59,12 @@ const goToPromoter = () => openPromotorPage(promoterSlug.value, router);
 
 const likesCount = computed(() => event.value?.like?.length || 0);
 const ticketsCount = computed(() => event.value?.tickets?.length || 0);
+const shopProducts = computed(() => event.value?.shop_products || []);
+const hasShop = computed(() => shopProducts.value.length > 0);
+const shopHasStock = computed(() =>
+    shopProducts.value.some((item) => Number(item.qtd) > 0 && !item.sold_out)
+);
+const shopCheckoutTo = computed(() => (event.value?.slug ? '/loja/' + event.value.slug + '/checkout' : ''));
 const hasLineups = computed(() => (event.value?.lineups || []).length > 0);
 const hasRecommended = computed(() => recommended.value.length > 0);
 const liveStatus = ref(null);
@@ -350,6 +356,46 @@ watch(() => route.params.id, getData);
                         <p v-else class="detail-text mb-0">Ainda não há bilhetes publicados para este evento.</p>
                     </div>
 
+                    <div v-if="hasShop" class="detail-panel mb-4">
+                        <h2 class="detail-title">Loja do evento</h2>
+                        <p class="detail-text">Paga agora e levanta no evento.</p>
+                        <div class="shop-grid">
+                            <component
+                                :is="isOnSale && shopHasStock ? 'router-link' : 'article'"
+                                v-for="item in shopProducts"
+                                :key="item.id"
+                                class="shop-card"
+                                :to="isOnSale && shopHasStock ? shopCheckoutTo + '?product=' + item.id : undefined"
+                            >
+                                <img
+                                    v-if="item.image && !brokenImages.has(`shop-${item.id}`)"
+                                    :src="storageURL + item.image"
+                                    :alt="item.name"
+                                    class="shop-card__image"
+                                    @error="markBrokenImage(`shop-${item.id}`)"
+                                />
+                                <div class="shop-card__body">
+                                    <div class="ticket-row__name">{{ item.name }}</div>
+                                    <div v-if="item.description" class="ticket-row__desc">{{ item.description }}</div>
+                                    <div v-if="item.variants?.length" class="shop-card__sizes">
+                                        {{ item.variants.map((row) => row.name).join(' · ') }}
+                                    </div>
+                                    <div class="flex justify-content-between align-items-center mt-2">
+                                        <span class="ticket-row__price">{{ formatTicketPrice(item.sell_price) }}</span>
+                                        <Tag
+                                            v-if="Number(item.qtd) <= 0 || item.sold_out"
+                                            value="Esgotado"
+                                            severity="danger"
+                                        />
+                                    </div>
+                                </div>
+                            </component>
+                        </div>
+                        <router-link v-if="isOnSale && shopHasStock" :to="shopCheckoutTo" class="mt-3 inline-block">
+                            <Button label="Comprar na loja" icon="pi pi-shopping-bag" class="p-button-rounded border-none font-medium text-white bg-blue-500" />
+                        </router-link>
+                    </div>
+
                     <div v-if="hasLineups" class="detail-panel mb-4">
                         <h2 class="detail-title">Line-up</h2>
                         <div class="lineup-list">
@@ -403,6 +449,10 @@ watch(() => route.params.id, getData);
                             <Button label="Comprar bilhetes" class="w-full p-button-rounded border-none font-medium text-white bg-blue-500" />
                         </router-link>
                         <Button v-else label="Vendas encerradas" class="w-full p-button-rounded" disabled />
+
+                        <router-link v-if="hasShop && isOnSale && shopHasStock" :to="shopCheckoutTo" class="w-full mt-2 block">
+                            <Button label="Comprar na loja" icon="pi pi-shopping-bag" class="w-full p-button-rounded p-button-outlined" />
+                        </router-link>
 
                         <router-link v-if="hostPromotorSlug" to="/" class="w-full mt-2 block">
                             <Button label="Voltar ao promotor" class="w-full p-button-rounded p-button-outlined" />
@@ -607,6 +657,46 @@ watch(() => route.params.id, getData);
     font-weight: 700;
     color: #2563eb;
     white-space: nowrap;
+}
+
+.shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+    gap: 0.85rem;
+}
+
+.shop-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid var(--surface-border);
+    border-radius: 0.85rem;
+    overflow: hidden;
+    background: #f8fafc;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+a.shop-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(15, 40, 80, 0.08);
+}
+
+.shop-card__image {
+    width: 100%;
+    height: 10rem;
+    object-fit: cover;
+    display: block;
+    background: #e8eef7;
+}
+
+.shop-card__body {
+    padding: 0.85rem 1rem 1rem;
+}
+
+.shop-card__sizes {
+    margin-top: 0.35rem;
+    color: #64748b;
+    font-size: 0.85rem;
 }
 
 .buy-card {

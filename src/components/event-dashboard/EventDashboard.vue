@@ -25,14 +25,17 @@ const {
     brokenImage,
     loadingPdfProducts,
     loadingPdfTickets,
+    loadingPdfShop,
     eventData,
     eventImage,
     currentStatus,
     barRevenue,
+    shopRevenue,
     kpis,
     summaryCards,
     filteredTickets,
     filteredProducts,
+    filteredShopProducts,
     filteredInvites,
     filteredBars,
     hasActiveFilters,
@@ -45,6 +48,8 @@ const {
     barSoldQty,
     barSoldValue,
     ticketSoldQty,
+    shopSoldQty,
+    shopSoldValue,
     goBack,
     getData,
     clearFilters,
@@ -151,6 +156,7 @@ onMounted(() => getData());
                     <div class="flex flex-wrap gap-2">
                         <Button label="PDF bilhetes" icon="pi pi-file-pdf" outlined size="small" :loading="loadingPdfTickets" @click="downloadPDF('tickets')" />
                         <Button label="PDF produtos" icon="pi pi-file-pdf" outlined size="small" :loading="loadingPdfProducts" @click="downloadPDF('products')" />
+                        <Button label="PDF loja" icon="pi pi-file-pdf" outlined size="small" :loading="loadingPdfShop" @click="downloadPDF('shop')" />
                     </div>
                 </div>
 
@@ -216,6 +222,30 @@ onMounted(() => getData());
                             </Column>
                         </DataTable>
                         <p v-else class="tab-empty">{{ hasActiveFilters ? 'Nenhum produto corresponde à pesquisa.' : 'Sem produtos registados.' }}</p>
+                    </TabPanel>
+
+                    <TabPanel header="Loja">
+                        <div class="tab-toolbar">
+                            <router-link :to="`${dashboardPath}/loja`">
+                                <Button label="Dashboard loja" icon="pi pi-chart-bar" size="small" outlined />
+                            </router-link>
+                            <span class="text-600 text-sm">Receita loja: <strong>{{ formatCurrency(shopRevenue) }}</strong></span>
+                        </div>
+
+                        <DataTable v-if="filteredShopProducts.length" :value="filteredShopProducts" responsiveLayout="scroll" class="p-datatable-sm" :loading="isRefreshing">
+                            <Column field="name" header="Nome" sortable />
+                            <Column field="qtd" header="Stock atual" sortable />
+                            <Column header="Preço" sortable>
+                                <template #body="slotProps">{{ formatCurrency(slotProps.data.sell_price) }}</template>
+                            </Column>
+                            <Column header="Vendidos" sortable>
+                                <template #body="slotProps">{{ formatNumber(shopSoldQty(slotProps.data)) }}</template>
+                            </Column>
+                            <Column header="Valor vendas" sortable>
+                                <template #body="slotProps"><span class="text-900 font-medium">{{ formatCurrency(shopSoldValue(slotProps.data)) }}</span></template>
+                            </Column>
+                        </DataTable>
+                        <p v-else class="tab-empty">{{ hasActiveFilters ? 'Nenhum produto da loja corresponde à pesquisa.' : 'Sem produtos na loja.' }}</p>
                     </TabPanel>
 
                     <TabPanel header="Convites">
@@ -296,6 +326,7 @@ onMounted(() => getData());
 .kpi-icon--green, .summary-icon--green { background: #dcfce7; color: #16a34a; }
 .kpi-icon--purple, .summary-icon--purple { background: #ede9fe; color: #7c3aed; }
 .kpi-icon--orange, .summary-icon--orange { background: #ffedd5; color: #ea580c; }
+.kpi-icon--teal, .summary-icon--teal { background: #ccfbf1; color: #0d9488; }
 .summary-icon--cyan { background: #cffafe; color: #0891b2; }
 .summary-icon--indigo { background: #e0e7ff; color: #4f46e5; }
 .summary-icon--slate { background: #e2e8f0; color: #475569; }
@@ -346,6 +377,7 @@ onMounted(() => getData());
 .summary-card__bar--green { background: #16a34a; }
 .summary-card__bar--orange { background: #ea580c; }
 .summary-card__bar--purple { background: #7c3aed; }
+.summary-card__bar--teal { background: #0d9488; }
 .summary-card__bar--cyan { background: #0891b2; }
 .summary-card__bar--indigo { background: #4f46e5; }
 .summary-card__bar--slate { background: #64748b; }
