@@ -235,7 +235,7 @@ onMounted(() => {
 
         <section class="px-4 lg:px-8 mx-0 lg:mx-8 py-4">
             <Message severity="info" :closable="false" class="mb-4 w-full">
-                Pagas agora e levantas no dia do evento. Não há envios.
+                Pagas agora e levantas no dia do evento.
             </Message>
             <Message v-if="isEventClosed" severity="warn" :closable="false" class="mb-4 w-full">
                 As vendas deste evento já encerraram.
@@ -245,7 +245,7 @@ onMounted(() => {
                 <div class="col-12 lg:col-8">
                     <div class="detail-panel">
                         <h2 class="detail-title">Escolhe os produtos</h2>
-                        <p class="detail-text">Camisolas, bonés e merch. Máximo 5 unidades por tamanho.</p>
+                        <p class="detail-text">Camisolas, bonés e produtos. Máximo 5 unidades por tamanho.</p>
 
                         <div v-if="offers.length" class="ticket-list">
                             <div

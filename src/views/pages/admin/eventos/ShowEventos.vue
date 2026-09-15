@@ -625,7 +625,7 @@ onMounted(() => {
                                 <Button label="Adicionar produto" icon="pi pi-plus" size="small" />
                             </router-link>
                         </div>
-                        <p class="text-600 mt-0 mb-3">Camisolas, bonés e merch para pagar online e levantar no evento.</p>
+                        <p class="text-600 mt-0 mb-3">Camisolas, bonés e produtos para pagar online e levantar no evento.</p>
 
                         <DataTable v-if="shopProducts.length" :value="shopProducts" responsiveLayout="scroll" class="p-datatable-sm">
                             <Column field="name" header="Nome" sortable />
