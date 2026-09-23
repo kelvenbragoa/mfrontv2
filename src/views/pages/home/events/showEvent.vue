@@ -8,6 +8,7 @@ import { useToast } from 'primevue/usetoast';
 import moment from 'moment';
 import { getPromotorPublicUrl, openPromotorPage, shouldUseSubdomainUrls, getCurrentPromotorSlug, getEventPublicUrl, getMainSiteUrl, getMainSiteOrigin } from '@/utils/promotorHost';
 import EventLiveWatch from '@/components/live/EventLiveWatch.vue';
+import EventAgoraWatch from '@/components/live/EventAgoraWatch.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -68,10 +69,20 @@ const shopCheckoutTo = computed(() => (event.value?.slug ? '/loja/' + event.valu
 const hasLineups = computed(() => (event.value?.lineups || []).length > 0);
 const hasRecommended = computed(() => recommended.value.length > 0);
 const liveStatus = ref(null);
-const isLiveActive = computed(() => liveStatus.value?.status === 'active' || liveStatus.value?.active === true);
+const agoraLiveStatus = ref(null);
+const isLiveActive = computed(
+    () =>
+        liveStatus.value?.status === 'active' ||
+        liveStatus.value?.active === true ||
+        agoraLiveStatus.value?.status === 'active'
+);
 
 const onLiveStatus = (status) => {
     liveStatus.value = status;
+};
+
+const onAgoraLiveStatus = (status) => {
+    agoraLiveStatus.value = status;
 };
 
 const heroBackground = computed(() => {
@@ -337,6 +348,12 @@ watch(() => route.params.id, getData);
                         :event-id="event.slug || event.id"
                         :checkout-path="'/checkout/' + event.slug + '/evento'"
                         @status="onLiveStatus"
+                    />
+
+                    <EventAgoraWatch
+                        :event-id="event.slug || event.id"
+                        :checkout-path="'/checkout/' + event.slug + '/evento'"
+                        @status="onAgoraLiveStatus"
                     />
 
                     <div class="detail-panel mb-4">

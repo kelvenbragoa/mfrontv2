@@ -7,10 +7,10 @@ import { useRouter } from 'vue-router';
 // export const styleURL = 'http://127.0.0.1:8000';
 // export const storageURL = 'http://127.0.0.1:8000/storage/';
 
-// export const baseURL2 = 'http://10.45.64.193:8000';
-// export const baseURL = 'http://10.45.64.193:8000/api';
-// export const styleURL = 'http://10.45.64.193:8000';
-// export const storageURL = 'http://10.45.64.193:8000/storage/';
+// export const baseURL2 = 'http://10.0.8.71:8000';
+// export const baseURL = 'http://10.0.8.71:8000/api';
+// export const styleURL = 'http://10.0.8.71:8000';
+// export const storageURL = 'http://10.0.8.71:8000/storage/';
 
 
 export const baseURL2 = 'https://backend.mticket.co.mz';
@@ -22,6 +22,8 @@ export const storageURL = 'https://backend.mticket.co.mz/storage/';
 // export const baseURL = 'http://192.168.18.195:8000/api';
 // export const styleURL = 'http://192.168.18.195:8000';
 // export const storageURL = 'http://192.168.18.195:8000/storage/';
+
+export const reverbAppKey = '6d8a226a986fa17e4cb7';
 
 export function logout() {
     axios.post(`${baseURL}/logout`).then((response) => {
