@@ -53,6 +53,29 @@ const guestOptions = [
     { label: '3 convidados', value: 3 }
 ];
 
+const sessions = ref([]);
+const viewers = computed(() => live.value?.viewers || { current: 0, peak: 0, unique: 0 });
+
+const loadSessions = async () => {
+    try {
+        const response = await axios.get(`${apiBase.value}/sessions`);
+        sessions.value = response.data.sessions || [];
+    } catch {
+        sessions.value = [];
+    }
+};
+
+const formatDate = (value) =>
+    value ? new Date(value).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
+const formatDuration = (seconds) => {
+    const total = Number(seconds) || 0;
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    return h ? `${h}h ${m}min` : m ? `${m}min ${s}s` : `${s}s`;
+};
+
 const currentStatus = computed(() => statusMeta[live.value?.status] || statusMeta.idle);
 const isDisabled = computed(() => live.value?.status === 'disabled');
 const canAcceptMore = computed(() => accepted.value.length < (live.value?.max_guests || 1));
@@ -235,6 +258,7 @@ const enterStudio = async () => {
         const startResponse = await axios.post(`${apiBase.value}/start`);
         applyPayload(startResponse.data);
         emit('changed', startResponse.data.live);
+        loadSessions();
 
         clearInterval(pollTimer);
         heartbeatTimer = setInterval(sendHeartbeat, 5000);
@@ -277,6 +301,7 @@ const leaveStudio = async () => {
     } finally {
         isSaving.value = false;
         startPolling();
+        loadSessions();
     }
 };
 
@@ -335,6 +360,7 @@ const startPolling = () => {
 
 onMounted(() => {
     load();
+    loadSessions();
     startPolling();
 });
 
@@ -358,6 +384,10 @@ onBeforeUnmount(() => {
             <div class="flex align-items-center gap-2">
                 <h5 class="m-0">Live interativa</h5>
                 <Tag v-if="live" :value="currentStatus.label" :severity="currentStatus.severity" />
+                <template v-if="live?.active">
+                    <Tag icon="pi pi-eye" :value="`${viewers.current} a assistir`" severity="secondary" />
+                    <span class="text-500 text-sm">Pico {{ viewers.peak }} · Únicos {{ viewers.unique }}</span>
+                </template>
             </div>
             <Button v-if="!inStudio" icon="pi pi-refresh" text rounded :loading="isLoading" @click="load" />
         </div>
@@ -501,6 +531,33 @@ onBeforeUnmount(() => {
                     <LiveChat :event-ref="live.event_id" height="18rem" />
                 </div>
 
+                <div v-if="sessions.length" class="mt-4">
+                    <span class="font-semibold block mb-2">Histórico de lives</span>
+                    <div class="overflow-x-auto">
+                        <table class="sessions-table">
+                            <thead>
+                                <tr>
+                                    <th>Início</th>
+                                    <th>Duração</th>
+                                    <th>Pico de espectadores</th>
+                                    <th>Espectadores únicos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="session in sessions" :key="session.id">
+                                    <td>
+                                        {{ formatDate(session.started_at) }}
+                                        <Tag v-if="!session.ended_at" value="Ao vivo" severity="danger" class="ml-1" />
+                                    </td>
+                                    <td>{{ formatDuration(session.duration_seconds) }}</td>
+                                    <td>{{ session.peak_viewers }}</td>
+                                    <td>{{ session.unique_viewers }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <div v-if="!inStudio" class="flex flex-wrap gap-2 mt-3">
                     <Button label="Desactivar live interativa" icon="pi pi-ban" severity="danger" outlined @click="disableDialog = true" />
                 </div>
@@ -521,6 +578,25 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.sessions-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.sessions-table th,
+.sessions-table td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--surface-border);
+    white-space: nowrap;
+}
+
+.sessions-table th {
+    color: var(--text-color-secondary);
+    font-weight: 600;
+}
+
 .live-empty {
     display: flex;
     flex-direction: column;

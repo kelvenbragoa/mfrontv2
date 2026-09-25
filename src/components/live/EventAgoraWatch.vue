@@ -45,6 +45,7 @@ const remoteUsers = shallowRef([]);
 let client = null;
 let statusTimer = null;
 let guestTimer = null;
+let presenceTimer = null;
 
 const isActive = computed(() => live.value?.status === 'active');
 const hasLive = computed(() => Boolean(live.value) && live.value.status !== 'disabled');
@@ -79,6 +80,16 @@ const loadStatus = async () => {
         live.value = null;
     } finally {
         isLoading.value = false;
+    }
+};
+
+const sendPresence = async () => {
+    if (!joined.value || !isActive.value) return;
+    try {
+        const response = await axios.post(`${apiBase.value}/presence`);
+        live.value = { ...(live.value || {}), viewers: response.data.viewers };
+    } catch {
+        // counting is best-effort
     }
 };
 
@@ -158,6 +169,7 @@ const startWatching = async () => {
     try {
         const currentGuest = await joinAsAudience();
         joined.value = true;
+        sendPresence();
         guest.value = currentGuest;
         if (currentGuest) {
             await handleGuestUpdate(currentGuest);
@@ -365,11 +377,13 @@ const subscribeUserChannel = async () => {
 onMounted(() => {
     loadStatus();
     statusTimer = setInterval(loadStatus, 10000);
+    presenceTimer = setInterval(sendPresence, 20000);
     if (isLoggedIn.value) subscribeUserChannel();
 });
 
 onBeforeUnmount(async () => {
     clearInterval(statusTimer);
+    clearInterval(presenceTimer);
     if (joined.value) {
         stopWatching();
     }
@@ -389,6 +403,7 @@ onBeforeUnmount(async () => {
             <div class="flex align-items-center gap-2">
                 <h2 class="detail-title m-0">Live interativa</h2>
                 <Tag :value="isActive ? 'Ao vivo' : 'Aguarda o anfitrião'" :severity="isActive ? 'danger' : 'warning'" />
+                <Tag v-if="isActive && live.viewers" icon="pi pi-eye" :value="String(live.viewers)" severity="secondary" v-tooltip.top="'A assistir agora'" />
             </div>
             <Button v-if="joined" label="Sair" icon="pi pi-sign-out" text size="small" @click="stopWatching" />
         </div>
