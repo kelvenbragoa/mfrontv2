@@ -619,7 +619,8 @@ onMounted(() => {
                             <Column field="mobile" header="Telefone" />
                             <Column field="bi" header="BI" />
                             <Column field="user" header="Utilizador" />
-                            <Column field="tickets_count" header="Bilhetes validados" sortable />
+                            <Column field="tickets_count" header="Bilhetes Vendidos" sortable />
+                            <Column field="tickets_validated_count" header="Bilhetes Validados" sortable />
                             <Column header="Ações" style="width: 7rem">
                                 <template #body="slotProps">
                                     <div class="flex gap-1">
