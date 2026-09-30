@@ -22,6 +22,7 @@ const categories = ref([]);
 const protocols = ref([]);
 const selectedProtocol = ref(null); // Protocolo selecionado
 const total = ref(0);
+const totalValidated = ref(0);
 const idProtocolo = ref(0);
 
 
@@ -101,6 +102,7 @@ const getData = () => {
             // toast.add({ severity: 'success', summary: 'Success Message', detail: 'Message Detail', life: 3000 });
             retriviedData.value = response.data.protocolo;
             total.value = response.data.total;
+            totalValidated.value = response.data.total_validated;
             protocols.value = response.data.protocols;
             // cities.value = response.data.city;
             // categories.value = response.data.category;
@@ -144,8 +146,19 @@ onMounted(() => {
                             <template #content>
                                 <div class="indicator-card">
                                     <span class="pi pi-chart-bar icon"></span>
-                                    <h4>Bilhetes Verificados</h4>
+                                    <h4>Bilhetes Vendidos</h4>
                                     <p class="value">{{ total }}</p>
+                                </div>
+                            </template>
+                        </Card>
+                    </div>
+                    <div class="col-12 md:col-6 lg:col-3">
+                        <Card>
+                            <template #content>
+                                <div class="indicator-card">
+                                    <span class="pi pi-chart-bar icon"></span>
+                                    <h4>Bilhetes Validados</h4>
+                                    <p class="value">{{ totalValidated }}</p>
                                 </div>
                             </template>
                         </Card>
