@@ -9,6 +9,7 @@ import { useToast } from 'primevue/usetoast';
 import InputText from 'primevue/inputtext';
 import Dropdown from 'primevue/dropdown';
 import moment from 'moment';
+import InviteBatchesCard from '@/components/invites/InviteBatchesCard.vue';
 
 const router = useRouter();
 const isLoadingDiv = ref(true);
@@ -166,12 +167,10 @@ onMounted(() => {
 
             <p><strong>Nome: </strong>{{ retriviedData.name }}</p>
             <p><strong>Descrição: </strong>{{ retriviedData.description }}</p>
-            <!-- <p><strong>Preço: </strong>{{ retriviedData.price }}</p>
-                <p><strong>Quantidade Máxima: </strong>{{ retriviedData.max_qtd }}</p>
-                <p><strong>Data Inicio: </strong> {{ retriviedData.start_date }} - {{ retriviedData.start_time }}</p>
-                <p><strong>Data Fim: </strong> {{ retriviedData.end_date }} - {{ retriviedData.end_time }}</p>
-             -->
             <hr />
+
+            <InviteBatchesCard :invite="retriviedData" @batch-created="getData" @batch-returned="getData" />
+
             <h5 class="mt-2 mb-2">Convidados Para o Evento</h5>
             <!-- /promotor/eventos/:id/bilhetes/create -->
 
@@ -196,7 +195,14 @@ onMounted(() => {
                     </template>
                 </Column>
                 <Column field="name" sortable header="Nome"></Column>
-                <Column field="status" sortable header="Estado"></Column>
+                <Column field="status" header="Estado">
+                    <template #body="slotProps">
+                        <Tag severity="success" v-if="slotProps.data.status == 1">Válido</Tag>
+                        <Tag severity="danger" v-else-if="slotProps.data.status == 0">Usado</Tag>
+                        <Tag severity="warning" v-else-if="slotProps.data.status == 2">Devolvido</Tag>
+                        <Tag v-else>—</Tag>
+                    </template>
+                </Column>
                 <Column header="Ações">
                     <template #body="slotProps">
                         <router-link :to="'/admin/eventos/' + retriviedData.event_id + '/convites/' + slotProps.data.invite_id + '/cliente/' + slotProps.data.id" class="mr-2"><i class="pi pi-eye"></i></router-link>

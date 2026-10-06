@@ -54,10 +54,15 @@ const ticketLocation = (evt) => {
     return parts.join(', ');
 };
 
-const formatMoney = (value) =>
-    typeof value === 'string' && value.includes('MT')
-        ? value
-        : `${Number(value || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} MT`;
+const formatMoney = (value) => {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed === '' || trimmed.includes('MT') || Number.isNaN(Number(trimmed))) {
+            return trimmed || '—';
+        }
+    }
+    return `${Number(value || 0).toLocaleString('pt-MZ', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} MT`;
+};
 
 const loteLabel = computed(() => {
     const n = props.batchNumber;

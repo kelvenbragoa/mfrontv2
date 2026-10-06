@@ -25,63 +25,71 @@ function goBackUsingBack() {
         router.back();
     }
 }
+const MAX_QTY = 500;
+
 const schema = yup.object({
     name: yup.string().required().trim().label('Nome'),
-    // price: yup.string().required().trim().label('Preco'),
     description: yup.string().required().trim().label('Descricao'),
-    // max_qtd: yup.string().required().label('Quantidade'),
     event_id: yup.string().required().label('Evento'),
-    // start_date: yup.string().required().label('Data'),
-    // start_time: yup.string().required().label('Horas'),
-    // end_date: yup.string().required().label('Data'),
-    // end_time: yup.string().required().label('Horas')
-
-    // email: yup.string().required().email().label('Email province_id'),
-    // fullName: yup.string().required().label('Full name'),
-    // password: yup.string().required().min(6).label('Password'),
-    // passwordConfirm: yup
-    //     .string()
-    //     .oneOf([yup.ref('password')], 'Passwords must match')
-    //     .required()
-    //     .label('Password confirmation'),
-    // terms: yup.boolean().required().isTrue('You must agree to terms and conditions').label('terms agreement'),
-    // type: yup.string().required().label('Account type')
+    qty: yup
+        .number()
+        .nullable()
+        .transform((value, original) => (original === '' || original === null || original === undefined ? null : value))
+        .min(1, 'Mínimo 1')
+        .max(MAX_QTY, `Máximo ${MAX_QTY}`)
+        .label('Quantidade')
 });
 
 const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
-    validationSchema: schema
+    validationSchema: schema,
+    initialValues: {
+        qty: null
+    }
 });
 
 const [name] = defineField('name');
 const [event_id] = defineField('event_id');
 const [description] = defineField('description');
-// const [max_qtd] = defineField('max_qtd');
-// const [start_date] = defineField('start_date');
-// const [start_time] = defineField('start_time');
-// const [end_date] = defineField('end_date');
-// const [end_time] = defineField('end_time');
-// const [price] = defineField('price');
-
-
+const [qty] = defineField('qty');
 
 const onSubmit = handleSubmit((values) => {
-
     isLoadingButton.value = true;
+    const payload = {
+        name: values.name,
+        description: values.description,
+        event_id: values.event_id,
+        ...(values.qty ? { qty: values.qty } : {})
+    };
     axios
-        .post(`${baseURL}/promotor-invites`, values, {
-            headers: {
-                'Content-Type': 'multipart/form-data'
-            }
-        })
+        .post(`${baseURL}/promotor-invites`, payload)
         .then((response) => {
             resetForm();
-            router.back();
-            toast.add({ severity: 'success', summary: `Successo`, detail: 'Convite criado com sucesso', life: 3000 });
+            const inviteId = response.data?.invite?.id;
+            const eventId = values.event_id;
+            if (inviteId) {
+                router.push(`/promotor/eventos/${eventId}/convites/${inviteId}`);
+            } else {
+                router.back();
+            }
+            const generated = values.qty
+                ? ` e ${values.qty} convites gerados com o nome “${values.name}”`
+                : '';
+            toast.add({
+                severity: 'success',
+                summary: 'Sucesso',
+                detail: `Convite criado com sucesso${generated}.`,
+                life: 3500
+            });
         })
         .catch((error) => {
             isLoadingButton.value = false;
-            toast.add({ severity: 'error', summary: `${error.response.data.message}`, detail: 'Detalhe da Mensagem', life: 3000 });
-            if (error.response.data.errors) {
+            toast.add({
+                severity: 'error',
+                summary: `${error.response?.data?.message || 'Erro'}`,
+                detail: 'Detalhe da Mensagem',
+                life: 3000
+            });
+            if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
             }
         })
@@ -136,11 +144,21 @@ onMounted(() => {
                             <InputText v-model="name" id="name" type="text" :class="{ 'p-invalid': errors.name }" />
                             <small id="name-help" class="p-error">{{ errors.name }}</small>
                         </div>
-                        <!-- <div class="field">
-                            <label for="price">Preço</label>
-                            <InputText v-model="price" id="price" type="number" :class="{ 'p-invalid': errors.price }" />
-                            <small id="price-help" class="p-error">{{ errors.price }}</small>
-                        </div> -->
+                        <div class="field">
+                            <label for="qty">Quantidade a gerar (opcional)</label>
+                            <InputNumber
+                                id="qty"
+                                v-model="qty"
+                                class="w-full"
+                                :min="1"
+                                :max="MAX_QTY"
+                                showButtons
+                                placeholder="1 a 500"
+                                :class="{ 'p-invalid': errors.qty }"
+                            />
+                            <small class="text-600">Qualquer número de 1 a {{ MAX_QTY }}. Se preencheres, gera logo um lote com esse nome.</small>
+                            <small id="qty-help" class="p-error">{{ errors.qty }}</small>
+                        </div>
                         <div class="field">
                             <label for="description">Descrição</label>
                             <InputText v-model="description" id="description" type="text" :class="{ 'p-invalid': errors.description }" />

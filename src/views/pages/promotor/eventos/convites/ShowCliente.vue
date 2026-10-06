@@ -1,111 +1,83 @@
 <script setup>
-import { RouterView, RouterLink, useRouter, useRoute } from 'vue-router';
-import { baseURL, storageURL } from '@/service/ApiConstant';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import axios from 'axios';
-import { useForm } from 'vee-validate';
-import * as yup from 'yup';
+import { baseURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
-import InputText from 'primevue/inputtext';
-import Dropdown from 'primevue/dropdown';
-import moment from 'moment';
-import QrcodeVue from 'qrcode.vue';
-
+import DigitalTicket from '@/components/ticket/DigitalTicket.vue';
+import { useTicketPdf } from '@/composables/useTicketPdf';
 
 const router = useRouter();
-const isLoadingDiv = ref(true);
-const loadingprint = ref(false);
-const isLoadingButton = ref(false);
-const retriviedData = ref();
 const toast = useToast();
+const { isDownloading, downloadTicketsBySelector } = useTicketPdf();
 
-const inviteNumber = (invite) => invite?.invite_number || `#0${invite?.id ?? ''}`;
-const inviteQrValue = (invite) =>
-    invite?.qrcode ||
-    JSON.stringify({ s: invite.status, c: invite.id, ie: invite.event_id });
-const provinces = ref([]);
-const cities = ref([]);
-const typeevent = ref([]);
-const categories = ref([]);
-const tickets = ref([]);
+const isLoadingDiv = ref(true);
+const retriviedData = ref(null);
 
-//DIALOG
-const displayCreateTicket = ref(false);
-const openCreateTicket = () => {
-    displayCreateTicket.value = true;
-};
-const closeCreateTicket = () => {
-    displayCreateTicket.value = false;
-};
+const inviteNumber = computed(
+    () => retriviedData.value?.invite_number || `#0${retriviedData.value?.id ?? ''}`
+);
+
+const inviteQrValue = computed(() => {
+    const invite = retriviedData.value;
+    if (!invite) return '';
+    return (
+        invite.qrcode ||
+        JSON.stringify({
+            s: invite.status,
+            i: invite.id,
+            ie: invite.event_id
+        })
+    );
+});
+
+const ticketStatusKey = computed(() => {
+    const status = Number(retriviedData.value?.status);
+    if (status === 0) return 'used';
+    if (status === 2) return 'cancelled';
+    return 'valid';
+});
+
+const statusLabel = computed(() => {
+    const status = Number(retriviedData.value?.status);
+    if (status === 0) return 'Usado';
+    if (status === 2) return 'Devolvido';
+    if (status === 1) return 'Válido';
+    return '—';
+});
+
+const statusSeverity = computed(() => {
+    const status = Number(retriviedData.value?.status);
+    if (status === 0) return 'danger';
+    if (status === 2) return 'warning';
+    if (status === 1) return 'success';
+    return 'secondary';
+});
 
 function goBackUsingBack() {
-    if (router) {
-        router.back();
-    }
+    router?.back();
 }
-const schema = yup.object({
-    name: yup.string().required().label('Name'),
-    address: yup.string().required().label('Address'),
-    city: yup.string().required().label('City'),
-    province_id: yup.string().required().label('Province')
-});
 
-const { defineField, handleSubmit, resetForm, errors, setErrors } = useForm({
-    validationSchema: schema
-});
-
-const [name] = defineField('name');
-const [address] = defineField('address');
-const [city] = defineField('city');
-const [province_id] = defineField('province_id');
-
-const onSubmitCreateTicket = handleSubmit((values) => {
-    console.log('Submitted with', values);
-    isLoadingButton.value = true;
-    axios
-        .post(`${baseURL}/drivers`, values)
-        .then((response) => {
-            resetForm();
-            router.push({ path: '/drivers' });
-            toast.add({ severity: 'success', summary: `Successo`, detail: 'Registro criada com sucesso', life: 3000 });
-        })
-        .catch((error) => {
-            isLoadingButton.value = false;
-            toast.add({ severity: 'error', summary: `${error.response.data.message}`, detail: 'Detalhe da Mensagem', life: 3000 });
-            if (error.response.data.errors) {
-                setErrors(error.response.data.errors);
-            }
-        })
-        .finally(() => {
-            isLoadingButton.value = false;
+const downloadInvite = async () => {
+    try {
+        await downloadTicketsBySelector(
+            '#invite-digital-ticket .ticket',
+            retriviedData.value?.event?.name || inviteNumber.value
+        );
+        toast.add({
+            severity: 'success',
+            summary: 'Sucesso',
+            detail: 'Convite descarregado com sucesso.',
+            life: 2500
         });
-});
-
-const downloadPDFCustomerInvite = () => {
-    loadingprint.value = true;
-
-
-    axios({
-        url: `${baseURL}/download-invite/${router.currentRoute.value.params.idcliente}`,
-        responseType: 'blob'
-    })
-        .then((response) => {
-            const url = window.URL.createObjectURL(new Blob([response.data]));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'invite-id-' + retriviedData.value.id + '.pdf');
-            document.body.appendChild(link);
-            link.click();
-            loadingprint.value = false;
-            toast.add({ severity: 'success', summary: `Sucesso`, detail: 'Documento baixado com sucesso', life: 3000 });
-        })
-        .catch((error) => {
-            loadingprint.value = false;
-            toast.add({ severity: 'error', summary: `Erro`, detail: 'Erro', life: 3000 });
-        })
-        .finally(() => {
-            loadingprint.value = false;
+    } catch {
+        toast.add({
+            severity: 'error',
+            summary: 'Erro',
+            detail: 'Não foi possível gerar o PDF.',
+            life: 4000
         });
+    }
 };
 
 const getData = () => {
@@ -117,302 +89,88 @@ const getData = () => {
         })
         .catch((error) => {
             isLoadingDiv.value = false;
-            toast.add({ severity: 'error', summary: `${error}`, detail: 'Message Detail', life: 3000 });
+            toast.add({
+                severity: 'error',
+                summary: 'Erro',
+                detail: error?.response?.data?.message || 'Não foi possível carregar o convite.',
+                life: 3000
+            });
             goBackUsingBack();
         });
 };
-onMounted(() => {
-    getData();
-});
-</script>
-<template>
-    <div className="card" v-if="!isLoadingDiv">
-        <div class="col-12">
-            <div class="card-w-title">
-                <Button label="Voltar" class="mr-2 mb-2" @click="goBackUsingBack"><i class="pi pi-angle-left"></i> Voltar</Button>
-                <Button label="Imprimir" class="mr-2 mb-2" @click="downloadPDFCustomerInvite" :disabled="loadingprint"><i class="pi pi-print"></i> Imprimir</Button>
-                <ProgressSpinner style="width: 35px; height: 35px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" v-if="loadingprint" />
 
-                <!-- <h5>Evento</h5> -->
+onMounted(getData);
+</script>
+
+<template>
+    <div class="card" v-if="!isLoadingDiv && retriviedData">
+        <div class="col-12">
+            <div class="card-w-title flex flex-wrap align-items-center gap-2 mb-3">
+                <Button label="Voltar" icon="pi pi-angle-left" class="mr-2 mb-2" @click="goBackUsingBack" />
+                <Button
+                    label="Baixar PDF"
+                    icon="pi pi-download"
+                    class="mr-2 mb-2"
+                    outlined
+                    :loading="isDownloading"
+                    :disabled="isDownloading || Number(retriviedData.status) === 2"
+                    @click="downloadInvite"
+                />
             </div>
 
-            <p>Convite</p>
-
-            <p><strong>Nº: </strong>{{ inviteNumber(retriviedData) }}</p>
-            <p><strong>Evento: </strong>{{ retriviedData.event.name }}</p>
-            <p><strong>Bilhete: </strong>{{ retriviedData.invite.name }}</p>
+            <p class="mt-0 mb-2">Detalhes do convite</p>
+            <p><strong>Nº: </strong>{{ inviteNumber }}</p>
+            <p><strong>Evento: </strong>{{ retriviedData.event?.name }}</p>
+            <p><strong>Tipo: </strong>{{ retriviedData.invite?.name }}</p>
             <p><strong>Nome: </strong>{{ retriviedData.name }}</p>
+            <p class="mb-0">
+                <strong>Estado: </strong>
+                <Tag :value="statusLabel" :severity="statusSeverity" />
+            </p>
+
             <hr />
 
-            <div class="ticket">
-                <div class="left">
-                    <div class="image" :style="`background-image: url(${storageURL}${retriviedData.event.image})`">
-                        <p class="admit-one">
-                            <span>Mticket</span>
-                            <span>Mticket</span>
-                            <span>Mticket</span>
-                        </p>
-                        <div class="ticket-number">
-                            <p>{{ inviteNumber(retriviedData) }}</p>
-                        </div>
-                    </div>
-                    <div class="ticket-info">
-                        <p class="date">
-                            <span>{{ moment(retriviedData.event.start_date).format('dddd') }}</span>
-                            <span class="june-29">{{ moment(retriviedData.event.start_date).format('D') }} - {{ moment(retriviedData.event.start_date).format('MM') }}</span>
-                            <span>{{ moment(retriviedData.event.start_date).format('YYYY') }}</span>
-                        </p>
-                        <div class="show-name">
-                            <h1>{{ retriviedData.event.name }}</h1>
-                            <br />
-                            <h2>{{ retriviedData.name }}</h2>
-                            <h2>{{ retriviedData.invite.name }}</h2>
-                            <div class="cardticket">
-                                <p>{{ retriviedData.invite.description }}</p>
-                            </div>
-                        </div>
-                        <div class="time">
-                            <p>{{ moment(retriviedData.event.start_time, 'HH:mm:ss').format('HH:mm') }}</p>
-                        </div>
-                        <p class="location">
-                            <span>{{ retriviedData.event.address }}</span> <span class="separator"> </span><span>{{ retriviedData.event.province.name }}, Moçambique</span>
-                        </p>
-                    </div>
-                </div>
-                <div class="right">
-                    <p class="admit-one">
-                        <span>Mticket</span>
-                        <span>Mticket</span>
-                        <span>Mticket</span>
-                    </p>
-                    <div class="right-info-container">
-                        <div class="show-name">
-                            <h1>{{ retriviedData.event.name }}</h1>
-                        </div>
-                        <div class="time">
-                            <p>{{ moment(retriviedData.event.start_time, 'HH:mm:ss').format('HH:mm') }} até {{ moment(retriviedData.event.end_time, 'HH:mm:ss').format('HH:mm') }}</p>
-                        </div>
-                        <div class="barcode">
-                            <qrcode-vue :value="inviteQrValue(retriviedData)" :size="100" level="H" render-as="svg" />
-                        </div>
-                        <p class="ticket-number">{{ inviteNumber(retriviedData) }}</p>
+            <div class="card mt-3 mb-0">
+                <h5 class="mt-0 mb-4">Convite</h5>
+                <div id="invite-digital-ticket" class="invite-ticket-preview">
+                    <div class="ticket-wrapper">
+                        <DigitalTicket
+                            :event="retriviedData.event"
+                            :code="inviteNumber"
+                            :qr-value="inviteQrValue"
+                            :type-name="retriviedData.invite?.name || 'Convite'"
+                            :buyer-name="retriviedData.name"
+                            :price="'Convite'"
+                            :status="ticketStatusKey"
+                        />
                     </div>
                 </div>
             </div>
         </div>
     </div>
     <div class="text-center" v-else>
-        <ProgressSpinner style="width: 50px; height: 50px" strokeWidth="8" fill="var(--surface-ground)" animationDuration=".5s" aria-label="Custom ProgressSpinner" />
+        <ProgressSpinner
+            style="width: 50px; height: 50px"
+            strokeWidth="8"
+            fill="var(--surface-ground)"
+            animationDuration=".5s"
+            aria-label="Custom ProgressSpinner"
+        />
         <p>Por Favor Aguarde...</p>
     </div>
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Open+Sans&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Staatliches&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap');
-
-body,
-html {
-    height: 100vh;
-    display: grid;
-    font-family: 'Staatliches', cursive;
-    background: #ffff;
-    color: black;
-    font-size: 14px;
-    letter-spacing: 0.1em;
+.invite-ticket-preview {
+    overflow-x: auto;
+    padding: 1rem 0.75rem;
+    background: #eaf3f9;
+    border-radius: 1.25rem;
 }
 
-.ticketgeneral {
-    height: 100vh;
-    display: grid;
-    font-family: 'Staatliches', cursive;
-    background: #ffff;
-    color: black;
-    font-size: 14px;
-    letter-spacing: 0.1em;
-}
-
-.ticket {
-    margin: auto;
-    display: flex;
-    background: white;
-    box-shadow: rgba(0, 0, 0, 0.3) 0px 19px 38px, rgba(0, 0, 0, 0.22) 0px 15px 12px;
-    margin-bottom: 5px;
-}
-
-.left {
-    display: flex;
-}
-
-.image {
-    height: 250px;
-    width: 250px;
-    /* background-image: url('/storage/{{$event->image}}'); */
-    background-size: contain;
-    opacity: 0.85;
-}
-
-.admit-one {
-    position: absolute;
-    color: darkgray;
-    height: 250px;
-    padding: 0 10px;
-    letter-spacing: 0.15em;
-    display: flex;
-    text-align: center;
-    justify-content: space-around;
-    writing-mode: vertical-rl;
-    transform: rotate(-180deg);
-}
-
-.admit-one span:nth-child(2) {
-    color: white;
-    font-weight: 700;
-}
-
-.left .ticket-number {
-    height: 250px;
-    width: 250px;
-    display: flex;
-    justify-content: flex-end;
-    align-items: flex-end;
-    padding: 5px;
-}
-
-.ticket-info {
-    padding: 10px 30px;
-    display: flex;
-    flex-direction: column;
-    text-align: center;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.date {
-    border-top: 1px solid gray;
-    border-bottom: 1px solid gray;
-    padding: 5px 0;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: space-around;
-}
-
-.date span {
-    width: 100px;
-}
-
-.date span:first-child {
-    text-align: left;
-}
-
-.date span:last-child {
-    text-align: right;
-}
-
-.date .june-29 {
-    color: #d83565;
-    font-size: 20px;
-}
-
-.show-name {
-    font-size: 20px;
-    font-family: 'Open Sans', cursive;
-    color: #d83565;
-}
-
-.show-name h1 {
-    font-size: 38px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    /* color: #04aff4; */
-    color: black;
-}
-
-.time {
-    padding: 10px 0;
-    /* color: #04aff4; */
-    color: black;
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    font-weight: 700;
-}
-
-.time span {
-    font-weight: 400;
-    color: gray;
-}
-
-.left .time {
-    font-size: 16px;
-}
-
-.location {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
+.ticket-wrapper {
     width: 100%;
-    padding-top: 8px;
-    border-top: 1px solid gray;
-}
-
-.location .separator {
-    font-size: 20px;
-}
-
-.right {
-    width: 180px;
-    border-left: 1px dashed #404040;
-}
-
-.right .admit-one {
-    color: darkgray;
-}
-
-.right .admit-one span:nth-child(2) {
-    color: gray;
-}
-
-.right .right-info-container {
-    height: 250px;
-    padding: 10px 10px 10px 35px;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-around;
-    align-items: center;
-}
-
-.right .show-name h1 {
-    font-size: 18px;
-}
-
-.barcode {
-    height: 100px;
-}
-
-.barcode img {
-    height: 100%;
-}
-
-.right .ticket-number {
-    color: gray;
-}
-
-.cardticket {
-    align-items: center;
-    padding: 10px 30px;
-    display: flex;
-    flex-direction: column;
-    text-align: center;
-    justify-content: space-between;
-    align-items: center;
-    max-width: 50ch;
-}
-
-.cardticket p {
-    color: black;
+    max-width: 980px;
+    margin: 0 auto;
 }
 </style>
