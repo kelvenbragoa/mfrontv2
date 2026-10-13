@@ -104,7 +104,7 @@ const paintClonedTicketImage = (panel) => {
 };
 
 const inlineTicketImages = async (root) => {
-    const imgs = [...root.querySelectorAll('.ticket-image__photo')];
+    const imgs = [...root.querySelectorAll('.ticket-image__photo, .thermal-promo-photo')];
     await Promise.all(
         imgs.map(async (img) => {
             const src = img.getAttribute('src') || img.src;
@@ -210,6 +210,30 @@ const buildA4Pdf = (canvases, scale = 2) => {
     return pdf;
 };
 
+/** BOCA térmica: 15,24 cm × 8,26 cm, uma página por bilhete. */
+const THERMAL_W = 152.4;
+const THERMAL_H = 82.6;
+
+const buildThermalPdf = (canvases) => {
+    if (!canvases.length) return null;
+    const pdf = new jsPDF({
+        orientation: 'l',
+        unit: 'mm',
+        format: [THERMAL_W, THERMAL_H],
+        compress: true
+    });
+
+    canvases.forEach((canvas, index) => {
+        const shot = asImageShot(canvas);
+        if (index > 0) {
+            pdf.addPage([THERMAL_W, THERMAL_H], 'l');
+        }
+        pdf.addImage(shot.data, 'JPEG', 0, 0, THERMAL_W, THERMAL_H, undefined, 'FAST');
+    });
+
+    return pdf;
+};
+
 const buildLayoutPdf = (canvases, layout = 'boca', scale = 3) => {
     if (!canvases.length) return null;
     if (layout === 'a4') {
@@ -267,6 +291,7 @@ export function useTicketPdf() {
         downloadTicketsBySelector,
         buildPdfBlobFromElements,
         captureTicketEl,
-        buildLayoutPdf
+        buildLayoutPdf,
+        buildThermalPdf
     };
 }

@@ -5,6 +5,7 @@ import moment from 'moment';
 import { baseURL } from '@/service/ApiConstant';
 import { useToast } from 'primevue/usetoast';
 import BatchDigitalTicket from '@/components/ticket/BatchDigitalTicket.vue';
+import ThermalBocaTicket from '@/components/ticket/ThermalBocaTicket.vue';
 import { useTicketPdf } from '@/composables/useTicketPdf';
 
 const props = defineProps({
@@ -14,7 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['stock-updated']);
 
 const toast = useToast();
-const { captureTicketEl, buildLayoutPdf } = useTicketPdf();
+const { captureTicketEl, buildLayoutPdf, buildThermalPdf } = useTicketPdf();
 const batches = ref([]);
 const isLoading = ref(false);
 const isSaving = ref(false);
@@ -23,6 +24,8 @@ const loadingPdfKey = ref(null);
 const pdfProgress = ref('');
 const printItem = ref(null);
 const printStage = ref(null);
+const thermalItem = ref(null);
+const thermalStage = ref(null);
 
 const displayCreate = ref(false);
 const displayReturn = ref(false);
@@ -250,11 +253,16 @@ const downloadPdf = async (batch, layout) => {
         }
 
         const canvases = [];
-        const scale = 2;
+        const isThermal = layout === 'boca-thermal';
+        const scale = isThermal ? 3 : 2;
+        if (isThermal && document.fonts?.load) {
+            await document.fonts.load('500 12px Montserrat');
+            await document.fonts.load('900 12px Montserrat');
+        }
 
         for (let i = 0; i < units.length; i++) {
             pdfProgress.value = `A gerar ${i + 1} / ${units.length}`;
-            printItem.value = {
+            const payload = {
                 event: data.event,
                 ticketName: data.ticket?.name,
                 buyerName: data.buyer_name,
@@ -262,29 +270,41 @@ const downloadPdf = async (batch, layout) => {
                 batchNumber: data.batch_id ?? batch.id,
                 detail: units[i]
             };
+            if (isThermal) {
+                thermalItem.value = payload;
+            } else {
+                printItem.value = payload;
+            }
             await nextTick();
             await wait(60);
 
-            const ticketEl = printStage.value?.querySelector('.ticket');
+            const ticketEl = isThermal
+                ? thermalStage.value?.querySelector('.thermal-ticket')
+                : printStage.value?.querySelector('.ticket');
             if (!ticketEl) {
                 throw new Error('Não foi possível desenhar o bilhete.');
             }
             const canvas = await captureTicketEl(ticketEl, scale);
             canvases.push({
-                data: canvas.toDataURL('image/jpeg', 0.88),
+                data: canvas.toDataURL('image/jpeg', 0.92),
                 width: canvas.width,
                 height: canvas.height
             });
         }
 
-        const pdf = buildLayoutPdf(canvases, layout, scale);
+        const pdf = isThermal ? buildThermalPdf(canvases) : buildLayoutPdf(canvases, layout, scale);
         if (!pdf) {
             throw new Error('Não foi possível gerar o PDF.');
         }
         pdf.save(`lote-${batch.id}-${layout}.pdf`);
         toast.add({
             severity: 'success',
-            summary: layout === 'boca' ? 'PDF BOCA descarregado' : 'PDF A4 descarregado',
+            summary:
+                layout === 'boca-thermal'
+                    ? 'PDF BOCA térmico descarregado'
+                    : layout === 'boca'
+                      ? 'PDF BOCA descarregado'
+                      : 'PDF A4 descarregado',
             life: 2500
         });
     } catch (error) {
@@ -296,6 +316,7 @@ const downloadPdf = async (batch, layout) => {
         });
     } finally {
         printItem.value = null;
+        thermalItem.value = null;
         pdfProgress.value = '';
         loadingPdfKey.value = null;
     }
@@ -381,6 +402,16 @@ onMounted(loadBatches);
                         @click="downloadPdf(batch, 'boca')"
                     />
                     <Button
+                        label="BOCA thermal"
+                        icon="pi pi-print"
+                        outlined
+                        size="small"
+                        :loading="loadingPdfKey === `${batch.id}-boca-thermal`"
+                        :disabled="!batch.unused || !!loadingPdfKey"
+                        title="Térmico 15,24 × 8,26 cm, um bilhete por página"
+                        @click="downloadPdf(batch, 'boca-thermal')"
+                    />
+                    <Button
                         label="Devolver"
                         icon="pi pi-replay"
                         outlined
@@ -404,6 +435,17 @@ onMounted(loadBatches);
             :buyer-name="printItem.buyerName"
             :price="printItem.price"
             :batch-number="printItem.batchNumber"
+        />
+    </div>
+
+    <div ref="thermalStage" class="thermal-print-stage" aria-hidden="true">
+        <ThermalBocaTicket
+            v-if="thermalItem"
+            :event="thermalItem.event"
+            :code="thermalItem.detail.ticket_number || `#0${thermalItem.detail.id}`"
+            :qr-value="qrValue(thermalItem.detail)"
+            :type-name="thermalItem.ticketName"
+            :price="thermalItem.price"
         />
     </div>
 
@@ -553,6 +595,16 @@ onMounted(loadBatches);
     left: 0;
     top: 0;
     width: 980px;
+    opacity: 0.01;
+    pointer-events: none;
+    z-index: -1;
+}
+
+.thermal-print-stage {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 152.4mm;
     opacity: 0.01;
     pointer-events: none;
     z-index: -1;
