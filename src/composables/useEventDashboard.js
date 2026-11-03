@@ -28,6 +28,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
     const brokenImage = ref(false);
     const loadingPdfProducts = ref(false);
     const loadingPdfTickets = ref(false);
+    const loadingExcelTickets = ref(false);
     const loadingPdfShop = ref(false);
 
     const getData = async ({ silent = false } = {}) => {
@@ -78,43 +79,25 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         };
     });
 
-    const ticketRevenue = computed(() =>
-        (eventData.value?.tickets || []).reduce(
-            (sum, ticket) => sum + (ticket.sells || []).reduce((inner, sell) => inner + Number(sell.total || 0), 0),
-            0
-        )
-    );
-
-    const ticketsSold = computed(() =>
-        (eventData.value?.tickets || []).reduce(
-            (sum, ticket) => sum + (ticket.sells || []).reduce((inner, sell) => inner + Number(sell.qty || 0), 0),
-            0
-        )
-    );
-
     const barRevenue = computed(() => Number(dashboard.value?.totalamount || 0));
     const shopRevenue = computed(() => Number(dashboard.value?.shop_revenue || 0));
 
-    const invitesSent = computed(() =>
-        (eventData.value?.invites || []).reduce((sum, invite) => sum + (invite.customers?.length || 0), 0)
-    );
-
     const kpis = computed(() => [
-        { key: 'ticket-revenue', label: 'Receita bilhetes', value: formatCurrency(ticketRevenue.value), icon: 'pi pi-wallet', tone: 'blue' },
-        { key: 'tickets-sold', label: 'Bilhetes vendidos', value: formatNumber(ticketsSold.value), icon: 'pi pi-ticket', tone: 'green' },
+        { key: 'ticket-revenue', label: 'Receita bilhetes', value: formatCurrency(dashboard.value?.ticket_revenue), icon: 'pi pi-wallet', tone: 'blue' },
+        { key: 'tickets-sold', label: 'Bilhetes vendidos', value: formatNumber(dashboard.value?.tickets_sold), icon: 'pi pi-ticket', tone: 'green' },
         { key: 'bar-revenue', label: 'Receita bar', value: formatCurrency(barRevenue.value), icon: 'pi pi-shopping-bag', tone: 'purple' },
         { key: 'shop-revenue', label: 'Receita loja', value: formatCurrency(shopRevenue.value), icon: 'pi pi-shopping-cart', tone: 'teal' },
-        { key: 'invites', label: 'Convites enviados', value: formatNumber(invitesSent.value), icon: 'pi pi-envelope', tone: 'orange' }
+        { key: 'invites', label: 'Convites emitidos', value: formatNumber(dashboard.value?.invites_issued), icon: 'pi pi-envelope', tone: 'orange' }
     ]);
 
     const summaryCards = computed(() => [
         { key: 'tickets', label: 'Tipos de bilhete', value: dashboard.value?.tickets ?? 0, icon: 'pi pi-ticket', tone: 'blue', to: `${dashboardPath}/bilhetes` },
-        { key: 'packages', label: 'Pacotes', value: dashboard.value?.packages ?? 0, icon: 'pi pi-box', tone: 'green', to: `${dashboardPath}/pacotes` },
-        { key: 'invites', label: 'Convites', value: dashboard.value?.invites ?? 0, icon: 'pi pi-envelope', tone: 'orange', to: `${dashboardPath}/convites` },
+        { key: 'packages', label: 'Tipos de pacote', value: dashboard.value?.packages ?? 0, icon: 'pi pi-box', tone: 'green', to: `${dashboardPath}/pacotes` },
+        { key: 'invites', label: 'Tipos de convite', value: dashboard.value?.invites ?? 0, icon: 'pi pi-envelope', tone: 'orange', to: `${dashboardPath}/convites` },
         { key: 'lineups', label: 'Line-up', value: dashboard.value?.lineups ?? 0, icon: 'pi pi-users', tone: 'purple', to: `${dashboardPath}/lineups` },
         { key: 'bars', label: 'Bares', value: dashboard.value?.bars ?? 0, icon: 'pi pi-building', tone: 'cyan', to: basePath },
-        { key: 'shop', label: 'Loja', value: dashboard.value?.shop ?? 0, icon: 'pi pi-shopping-cart', tone: 'teal', to: `${dashboardPath}/loja` },
-        { key: 'products', label: 'Produtos', value: dashboard.value?.products ?? 0, icon: 'pi pi-tag', tone: 'indigo', to: basePath },
+        { key: 'shop', label: 'Produtos da loja', value: dashboard.value?.shop ?? 0, icon: 'pi pi-shopping-cart', tone: 'teal', to: `${dashboardPath}/loja` },
+        { key: 'products', label: 'Produtos do bar', value: dashboard.value?.products ?? 0, icon: 'pi pi-tag', tone: 'indigo', to: basePath },
         { key: 'protocols', label: 'Protocolos', value: dashboard.value?.protocols ?? 0, icon: 'pi pi-id-card', tone: 'slate', to: basePath },
         { key: 'barmans', label: 'Barmans', value: dashboard.value?.barmans ?? 0, icon: 'pi pi-user', tone: 'rose', to: basePath }
     ]);
@@ -145,12 +128,12 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         (eventData.value?.barstores || []).filter((row) => matchesSearch(row.name))
     );
 
-    const productSoldQty = (product) => (product.sells || []).reduce((sum, item) => sum + Number(item.qtd || 0), 0);
-    const productSoldValue = (product) => productSoldQty(product) * Number(product.sell_price || 0);
+    const productSoldQty = (product) => Number(product.sold_qtd || 0);
+    const productSoldValue = (product) => Number(product.sold_value || 0);
     const productInitialStock = (product) => Number(product.qtd || 0) + productSoldQty(product);
-    const barSoldQty = (bar) => (bar.sells || []).reduce((sum, item) => sum + Number(item.qtd || 0), 0);
-    const barSoldValue = (bar) => (bar.sells || []).reduce((sum, item) => sum + Number(item.total || 0), 0);
-    const ticketSoldQty = (ticket) => (ticket.sells || []).reduce((sum, item) => sum + Number(item.qty || 0), 0);
+    const barSoldQty = (bar) => Number(bar.sold_qtd || 0);
+    const barSoldValue = (bar) => Number(bar.sold_value || 0);
+    const ticketSoldQty = (ticket) => Number(ticket.stock_sells_count || 0);
     const shopSoldQty = (product) => Number(product.sold_qtd || 0);
     const shopSoldValue = (product) => Number(product.sold_value || 0);
 
@@ -161,6 +144,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         const reportMap = {
             products: { loading: loadingPdfProducts, path: 'products', file: `barreport${eventId}.pdf` },
             tickets: { loading: loadingPdfTickets, path: 'tickets', file: `ticketreport${eventId}.pdf` },
+            ticketSales: { loading: loadingExcelTickets, path: 'tickets/sales', file: `vendas-bilhetes-${eventId}.xlsx` },
             shop: { loading: loadingPdfShop, path: 'shop', file: `shopreport${eventId}.pdf` }
         };
         const report = reportMap[type] || reportMap.tickets;
@@ -198,6 +182,7 @@ export function useEventDashboard({ eventId, scope = 'promotor' }) {
         brokenImage,
         loadingPdfProducts,
         loadingPdfTickets,
+        loadingExcelTickets,
         loadingPdfShop,
         eventData,
         eventImage,

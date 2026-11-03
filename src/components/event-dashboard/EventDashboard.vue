@@ -25,6 +25,7 @@ const {
     brokenImage,
     loadingPdfProducts,
     loadingPdfTickets,
+    loadingExcelTickets,
     loadingPdfShop,
     eventData,
     eventImage,
@@ -65,7 +66,7 @@ onMounted(() => getData());
             <div class="col-12">
                 <Skeleton height="7rem" class="mb-3 border-round-xl" />
             </div>
-            <div v-for="n in 4" :key="`kpi-sk-${n}`" class="col-12 md:col-6 xl:col-3">
+            <div v-for="n in 5" :key="`kpi-sk-${n}`" class="col-12 md:col-6 xl:col">
                 <div class="card mb-0">
                     <Skeleton width="6rem" height="0.9rem" class="mb-3" />
                     <Skeleton width="8rem" height="1.75rem" />
@@ -118,7 +119,7 @@ onMounted(() => getData());
             </div>
 
             <div class="grid">
-                <div v-for="kpi in kpis" :key="kpi.key" class="col-12 md:col-6 xl:col-3">
+                <div v-for="kpi in kpis" :key="kpi.key" class="col-12 md:col-6 xl:col">
                     <div class="card mb-0 h-full kpi-card">
                         <div class="flex justify-content-between align-items-start mb-3">
                             <span class="block text-500 font-medium">{{ kpi.label }}</span>
@@ -155,6 +156,7 @@ onMounted(() => getData());
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <Button label="PDF bilhetes" icon="pi pi-file-pdf" outlined size="small" :loading="loadingPdfTickets" @click="downloadPDF('tickets')" />
+                        <Button label="Excel vendas" icon="pi pi-file-excel" outlined size="small" :loading="loadingExcelTickets" @click="downloadPDF('ticketSales')" />
                         <Button label="PDF produtos" icon="pi pi-file-pdf" outlined size="small" :loading="loadingPdfProducts" @click="downloadPDF('products')" />
                         <Button label="PDF loja" icon="pi pi-file-pdf" outlined size="small" :loading="loadingPdfShop" @click="downloadPDF('shop')" />
                     </div>
@@ -178,12 +180,18 @@ onMounted(() => getData());
 
                         <DataTable v-if="filteredTickets.length" :value="filteredTickets" responsiveLayout="scroll" class="p-datatable-sm" :loading="isRefreshing">
                             <Column field="name" header="Nome" sortable />
-                            <Column header="Preço" sortable>
+                            <Column field="price" header="Preço" sortable>
                                 <template #body="slotProps">{{ formatCurrency(slotProps.data.price) }}</template>
                             </Column>
-                            <Column field="max_qtd" header="Qtd. máxima" sortable />
-                            <Column header="Vendidos" sortable>
+                            <Column field="max_qtd" header="Lotação" sortable />
+                            <Column field="stock_sells_count" header="Vendidos" sortable>
                                 <template #body="slotProps">{{ formatNumber(ticketSoldQty(slotProps.data)) }}</template>
+                            </Column>
+                            <Column field="available_quantity" header="Disponíveis" sortable>
+                                <template #body="slotProps">{{ formatNumber(slotProps.data.available_quantity) }}</template>
+                            </Column>
+                            <Column field="sold_value" header="Receita" sortable>
+                                <template #body="slotProps"><span class="text-900 font-medium">{{ formatCurrency(slotProps.data.sold_value) }}</span></template>
                             </Column>
                             <Column header="Início">
                                 <template #body="slotProps">{{ formatDate(slotProps.data.start_date) }}</template>
@@ -198,26 +206,29 @@ onMounted(() => getData());
 
                     <TabPanel header="Produtos">
                         <div class="tab-toolbar">
+                            <router-link :to="`${dashboardPath}/bar`">
+                                <Button label="Dashboard bar" icon="pi pi-chart-bar" size="small" outlined />
+                            </router-link>
                             <span class="text-600 text-sm">Receita bar: <strong>{{ formatCurrency(barRevenue) }}</strong></span>
                         </div>
 
                         <DataTable v-if="filteredProducts.length" :value="filteredProducts" responsiveLayout="scroll" class="p-datatable-sm" :loading="isRefreshing">
                             <Column field="name" header="Nome" sortable />
                             <Column field="barstore.name" header="Bar" sortable />
-                            <Column header="Stock inicial" sortable>
+                            <Column header="Stock total recebido">
                                 <template #body="slotProps">{{ formatNumber(productInitialStock(slotProps.data)) }}</template>
                             </Column>
                             <Column field="qtd" header="Stock atual" sortable />
-                            <Column header="Preço venda" sortable>
+                            <Column field="sell_price" header="Preço venda" sortable>
                                 <template #body="slotProps">{{ formatCurrency(slotProps.data.sell_price) }}</template>
                             </Column>
-                            <Column header="Preço compra" sortable>
+                            <Column field="buy_price" header="Preço compra" sortable>
                                 <template #body="slotProps">{{ formatCurrency(slotProps.data.buy_price) }}</template>
                             </Column>
-                            <Column header="Qtd. vendida" sortable>
+                            <Column field="sold_qtd" header="Qtd. vendida" sortable>
                                 <template #body="slotProps">{{ formatNumber(productSoldQty(slotProps.data)) }}</template>
                             </Column>
-                            <Column header="Valor vendas" sortable>
+                            <Column field="sold_value" header="Valor vendas" sortable>
                                 <template #body="slotProps"><span class="text-900 font-medium">{{ formatCurrency(productSoldValue(slotProps.data)) }}</span></template>
                             </Column>
                         </DataTable>
@@ -235,13 +246,13 @@ onMounted(() => getData());
                         <DataTable v-if="filteredShopProducts.length" :value="filteredShopProducts" responsiveLayout="scroll" class="p-datatable-sm" :loading="isRefreshing">
                             <Column field="name" header="Nome" sortable />
                             <Column field="qtd" header="Stock atual" sortable />
-                            <Column header="Preço" sortable>
+                            <Column field="sell_price" header="Preço" sortable>
                                 <template #body="slotProps">{{ formatCurrency(slotProps.data.sell_price) }}</template>
                             </Column>
-                            <Column header="Vendidos" sortable>
+                            <Column field="sold_qtd" header="Vendidos" sortable>
                                 <template #body="slotProps">{{ formatNumber(shopSoldQty(slotProps.data)) }}</template>
                             </Column>
-                            <Column header="Valor vendas" sortable>
+                            <Column field="sold_value" header="Valor vendas" sortable>
                                 <template #body="slotProps"><span class="text-900 font-medium">{{ formatCurrency(shopSoldValue(slotProps.data)) }}</span></template>
                             </Column>
                         </DataTable>
@@ -258,24 +269,30 @@ onMounted(() => getData());
                         <DataTable v-if="filteredInvites.length" :value="filteredInvites" responsiveLayout="scroll" class="p-datatable-sm" :loading="isRefreshing">
                             <Column field="name" header="Nome" sortable />
                             <Column field="description" header="Descrição" />
-                            <Column header="Convidados" sortable>
-                                <template #body="slotProps">{{ formatNumber(slotProps.data.customers?.length || 0) }}</template>
+                            <Column field="customers_count" header="Convites emitidos" sortable>
+                                <template #body="slotProps">{{ formatNumber(slotProps.data.customers_count) }}</template>
                             </Column>
                         </DataTable>
                         <p v-else class="tab-empty">{{ hasActiveFilters ? 'Nenhum convite corresponde à pesquisa.' : 'Sem convites registados.' }}</p>
                     </TabPanel>
 
                     <TabPanel header="Bares">
+                        <div class="tab-toolbar">
+                            <router-link :to="`${dashboardPath}/bar`">
+                                <Button label="Dashboard bar" icon="pi pi-chart-bar" size="small" outlined />
+                            </router-link>
+                        </div>
+
                         <DataTable v-if="filteredBars.length" :value="filteredBars" responsiveLayout="scroll" class="p-datatable-sm" :loading="isRefreshing">
                             <Column field="name" header="Nome" sortable />
-                            <Column header="Qtd. vendida" sortable>
+                            <Column field="sold_qtd" header="Qtd. vendida" sortable>
                                 <template #body="slotProps">{{ formatNumber(barSoldQty(slotProps.data)) }}</template>
                             </Column>
-                            <Column header="Valor vendas" sortable>
+                            <Column field="sold_value" header="Valor vendas" sortable>
                                 <template #body="slotProps"><span class="text-900 font-medium">{{ formatCurrency(barSoldValue(slotProps.data)) }}</span></template>
                             </Column>
-                            <Column header="Produtos">
-                                <template #body="slotProps">{{ formatNumber(slotProps.data.products?.length || 0) }}</template>
+                            <Column field="products_count" header="Produtos" sortable>
+                                <template #body="slotProps">{{ formatNumber(slotProps.data.products_count) }}</template>
                             </Column>
                         </DataTable>
                         <p v-else class="tab-empty">{{ hasActiveFilters ? 'Nenhum bar corresponde à pesquisa.' : 'Sem bares registados.' }}</p>

@@ -22,10 +22,16 @@ const {
     searchQuery,
     ticketFilter,
     loadingPdf,
+    loadingExcel,
     kpis,
     ticketOptions,
     filteredReports,
-    filteredIssued,
+    issuedRows,
+    issuedTotal,
+    issuedLoading,
+    issuedPage,
+    onIssuedPage,
+    onIssuedSort,
     hasActiveFilters,
     chartDataDay,
     chartDataMonth,
@@ -38,7 +44,8 @@ const {
     goBack,
     getData,
     clearFilters,
-    downloadPdf
+    downloadPdf,
+    downloadExcel
 } = usePromotorTicketSalesDashboard({
     eventId,
     resource: props.resource,
@@ -113,6 +120,14 @@ onMounted(() => getData());
                     outlined
                     :loading="loadingPdf"
                     @click="downloadPdf"
+                />
+                <Button
+                    v-if="showPdf"
+                    icon="pi pi-file-excel"
+                    label="Excel"
+                    outlined
+                    :loading="loadingExcel"
+                    @click="downloadExcel"
                 />
             </div>
         </div>
@@ -206,21 +221,31 @@ onMounted(() => getData());
             <div class="card mt-3">
                 <div class="flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                     <h5 class="m-0">{{ issuedLabel }}</h5>
-                    <span class="text-600 text-sm">{{ formatNumber(filteredIssued.length) }} registos</span>
+                    <span class="text-600 text-sm">{{ formatNumber(issuedTotal) }} registos</span>
                 </div>
 
                 <DataTable
-                    v-if="filteredIssued.length"
-                    :value="filteredIssued"
+                    v-if="issuedTotal || issuedLoading"
+                    :value="issuedRows"
+                    lazy
+                    paginator
+                    :rows="issuedPage.rows"
+                    :first="issuedPage.first"
+                    :totalRecords="issuedTotal"
+                    :rowsPerPageOptions="[10, 20, 50, 100]"
+                    :sortField="issuedPage.sortField"
+                    :sortOrder="issuedPage.sortOrder"
                     responsiveLayout="scroll"
                     class="p-datatable-sm"
-                    :loading="isRefreshing"
+                    :loading="issuedLoading"
+                    @page="onIssuedPage"
+                    @sort="onIssuedSort"
                 >
                     <Column header="Tipo">
                         <template #body="slotProps">{{ slotProps.data.ticket?.name || '--' }}</template>
                     </Column>
                     <Column field="qty" header="Qtd" sortable />
-                    <Column header="Total" sortable>
+                    <Column field="total" header="Total" sortable>
                         <template #body="slotProps">
                             <span class="text-900 font-medium">{{ formatCurrency(slotProps.data.total) }}</span>
                         </template>
@@ -228,7 +253,7 @@ onMounted(() => getData());
                     <Column header="Cliente">
                         <template #body="slotProps">{{ customerLabel(slotProps.data) }}</template>
                     </Column>
-                    <Column header="Data" sortable>
+                    <Column field="created_at" header="Data" sortable>
                         <template #body="slotProps">{{ formatDateTime(slotProps.data.created_at) }}</template>
                     </Column>
                     <Column header="Formulário" style="width: 8rem">

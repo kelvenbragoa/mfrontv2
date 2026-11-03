@@ -428,6 +428,15 @@ const router = createRouter({
                     },
                     component: () => import('@/views/pages/admin/eventos/dashboard/bilhetes/IndexDashboardBilhetes.vue')
                 },
+                //evento dashboard bar
+                {
+                    path: '/admin/eventos/:id/dashboard/bar',
+                    name: 'admin.eventos.dashboard.bar',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/admin/eventos/dashboard/bar/IndexDashboardBar.vue')
+                },
                 //evento dashboard pacotes
                 {
                     path: '/admin/eventos/:id/dashboard/pacotes',
@@ -818,6 +827,15 @@ const router = createRouter({
                         requiresAuth: true
                     },
                     component: () => import('@/views/pages/promotor/eventos/dashboard/bilhetes/IndexDashboardBilhetes.vue')
+                },
+                //evento dashboard bar
+                {
+                    path: '/promotor/eventos/:id/dashboard/bar',
+                    name: 'promotor.eventos.dashboard.bar',
+                    meta: {
+                        requiresAuth: true
+                    },
+                    component: () => import('@/views/pages/promotor/eventos/dashboard/bar/IndexDashboardBar.vue')
                 },
                 //evento dashboard pacotes
                 {

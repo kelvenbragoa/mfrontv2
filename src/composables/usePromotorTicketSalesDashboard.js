@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import axios from 'axios';
 import { baseURL } from '@/service/ApiConstant';
@@ -34,6 +34,14 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
     const searchQuery = ref('');
     const ticketFilter = ref(null);
     const loadingPdf = ref(false);
+    const loadingExcel = ref(false);
+
+    const issuedRows = ref([]);
+    const issuedTotal = ref(0);
+    const issuedLoading = ref(false);
+    const issuedPage = ref({ first: 0, rows: 20, sortField: null, sortOrder: null });
+    let issuedRequestId = 0;
+    let searchTimer = null;
 
     const formatCurrency = (value) =>
         `${new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value) || 0)} MT`;
@@ -44,6 +52,55 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
 
     const goBack = () => router.push(backPath);
 
+    const fetchIssued = async () => {
+        const requestId = ++issuedRequestId;
+        const { first, rows, sortField, sortOrder } = issuedPage.value;
+        issuedLoading.value = true;
+
+        try {
+            const response = await axios.get(`${baseURL}/promotor-dashboard/${eventId}/vendas`, {
+                params: {
+                    page: Math.floor(first / rows) + 1,
+                    per_page: rows,
+                    search: searchQuery.value?.trim() || undefined,
+                    ticket_id: ticketFilter.value || undefined,
+                    sort_field: sortField || undefined,
+                    sort_order: sortOrder === 1 ? 'asc' : sortOrder === -1 ? 'desc' : undefined
+                }
+            });
+            if (requestId !== issuedRequestId) return;
+            issuedRows.value = response.data.data;
+            issuedTotal.value = response.data.total;
+        } catch {
+            if (requestId !== issuedRequestId) return;
+            toast.add({ severity: 'error', summary: 'Erro', detail: 'Não foi possível carregar as vendas.', life: 4000 });
+        } finally {
+            if (requestId === issuedRequestId) issuedLoading.value = false;
+        }
+    };
+
+    const onIssuedPage = (event) => {
+        issuedPage.value = { ...issuedPage.value, first: event.first, rows: event.rows };
+        fetchIssued();
+    };
+
+    const onIssuedSort = (event) => {
+        issuedPage.value = { ...issuedPage.value, first: 0, sortField: event.sortField, sortOrder: event.sortOrder };
+        fetchIssued();
+    };
+
+    const reloadIssuedFromStart = () => {
+        issuedPage.value = { ...issuedPage.value, first: 0 };
+        fetchIssued();
+    };
+
+    watch(ticketFilter, reloadIssuedFromStart);
+
+    watch(searchQuery, () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(reloadIssuedFromStart, 400);
+    });
+
     const getData = async ({ silent = false } = {}) => {
         if (silent) {
             isRefreshing.value = true;
@@ -51,6 +108,8 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
             isLoading.value = true;
         }
         loadError.value = null;
+
+        fetchIssued();
 
         try {
             const response = await axios.get(`${baseURL}/promotor-dashboard/${eventId}/${resource}`);
@@ -120,39 +179,15 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
     });
 
     const ticketOptions = computed(() =>
-        (data.value?.ticket_report || []).map((item) => ({ label: item.name, value: item.name }))
+        (data.value?.ticket_report || []).map((item) => ({ label: item.name, value: item.id }))
     );
 
     const filteredReports = computed(() => {
         let rows = data.value?.ticket_report || [];
         if (ticketFilter.value) {
-            rows = rows.filter((row) => row.name === ticketFilter.value);
+            rows = rows.filter((row) => row.id === ticketFilter.value);
         }
         return rows;
-    });
-
-    const matchesSearch = (row) => {
-        const query = searchQuery.value?.trim().toLowerCase();
-        if (!query) return true;
-
-        const ticketName = row.ticket?.name || '';
-        const customer = row.user_id == 0 ? 'mticket venda fisica' : `${row.name || ''} ${row.mobile || ''} ${row.email || ''}`;
-        const details = row.selldetails || row.sell_details || [];
-        const answersText = details
-            .flatMap((detail) => Object.values(detail.form_answers || {}))
-            .join(' ');
-
-        return [ticketName, customer, String(row.qty || ''), String(row.total || ''), answersText].some((part) =>
-            String(part).toLowerCase().includes(query)
-        );
-    };
-
-    const filteredIssued = computed(() => {
-        let rows = data.value?.tickets_issued || [];
-        if (ticketFilter.value) {
-            rows = rows.filter((row) => row.ticket?.name === ticketFilter.value);
-        }
-        return rows.filter(matchesSearch);
     });
 
     const hasActiveFilters = computed(() => !!searchQuery.value?.trim() || !!ticketFilter.value);
@@ -198,26 +233,32 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
     const customerLabel = (row) =>
         Number(row.user_id) === 0 ? 'MTicket — venda física' : [row.name, row.mobile].filter(Boolean).join(' · ') || 'Cliente';
 
-    const downloadPdf = async () => {
-        loadingPdf.value = true;
+    const downloadFile = async ({ loading, path, file, errorDetail }) => {
+        loading.value = true;
 
         try {
-            const response = await axios.get(`${baseURL}/download-report/${eventId}/tickets`, { responseType: 'blob' });
+            const response = await axios.get(`${baseURL}/download-report/${eventId}/${path}`, { responseType: 'blob' });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `ticketreport${eventId}.pdf`);
+            link.setAttribute('download', file);
             document.body.appendChild(link);
             link.click();
             link.remove();
             window.URL.revokeObjectURL(url);
             toast.add({ severity: 'success', summary: 'Relatório descarregado', life: 3000 });
         } catch {
-            toast.add({ severity: 'error', summary: 'Erro', detail: 'Não foi possível descarregar o PDF.', life: 4000 });
+            toast.add({ severity: 'error', summary: 'Erro', detail: errorDetail, life: 4000 });
         } finally {
-            loadingPdf.value = false;
+            loading.value = false;
         }
     };
+
+    const downloadPdf = () =>
+        downloadFile({ loading: loadingPdf, path: 'tickets', file: `ticketreport${eventId}.pdf`, errorDetail: 'Não foi possível descarregar o PDF.' });
+
+    const downloadExcel = () =>
+        downloadFile({ loading: loadingExcel, path: 'tickets/sales', file: `vendas-bilhetes-${eventId}.xlsx`, errorDetail: 'Não foi possível descarregar o Excel.' });
 
     return {
         title,
@@ -229,10 +270,16 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
         searchQuery,
         ticketFilter,
         loadingPdf,
+        loadingExcel,
         kpis,
         ticketOptions,
         filteredReports,
-        filteredIssued,
+        issuedRows,
+        issuedTotal,
+        issuedLoading,
+        issuedPage,
+        onIssuedPage,
+        onIssuedSort,
         hasActiveFilters,
         chartDataDay,
         chartDataMonth,
@@ -245,6 +292,7 @@ export function usePromotorTicketSalesDashboard({ eventId, resource, title, issu
         goBack,
         getData,
         clearFilters,
-        downloadPdf
+        downloadPdf,
+        downloadExcel
     };
 }
