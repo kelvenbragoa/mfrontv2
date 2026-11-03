@@ -348,6 +348,8 @@ const priceLabel = computed(() => {
     display: block;
     height: var(--logo-h);
     width: auto;
+    /* PNG a cores → preto sólido na BOCA térmica (como ticket (2).html) */
+    filter: brightness(0);
 }
 
 .slogan {
