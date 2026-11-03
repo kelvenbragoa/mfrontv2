@@ -15,7 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['stock-updated']);
 
 const toast = useToast();
-const { captureTicketEl, buildLayoutPdf, buildThermalPdf } = useTicketPdf();
+const { captureTicketEl, captureThermalTicketEl, inlineTicketImages, buildLayoutPdf, buildThermalPdf } = useTicketPdf();
 const batches = ref([]);
 const isLoading = ref(false);
 const isSaving = ref(false);
@@ -34,19 +34,13 @@ const returningBatch = ref(null);
 const form = ref(emptyForm());
 const returnQty = ref(1);
 
-const sizes = [100, 200, 300, 400, 500];
+const quickSizes = [10, 50, 100, 500, 1000];
 
 const available = computed(() => Number(props.ticket?.available_quantity ?? 0));
 const isLive = computed(() => !!props.ticket?.is_live);
-const canGenerate = computed(() => !isLive.value && available.value >= 100);
+const canGenerate = computed(() => !isLive.value && available.value >= 1);
 
-const qtyOptions = computed(() =>
-    sizes.map((value) => ({
-        label: `${value} bilhetes`,
-        value,
-        disabled: value > available.value
-    }))
-);
+const quickOptions = computed(() => quickSizes.filter((value) => value < available.value));
 
 const channelLabel = (channel) =>
     ({
@@ -97,8 +91,7 @@ const loadBatches = async () => {
 
 const openCreate = () => {
     form.value = emptyForm();
-    const firstAllowed = sizes.find((size) => size <= available.value);
-    form.value.qty = firstAllowed || null;
+    form.value.qty = Math.min(100, available.value) || null;
     displayCreate.value = true;
 };
 
@@ -113,8 +106,9 @@ const createBatch = async () => {
         toast.add({ severity: 'warn', summary: 'Atenção', detail: 'Indica o destinatário do lote.', life: 3000 });
         return;
     }
-    if (!sizes.includes(Number(form.value.qty))) {
-        toast.add({ severity: 'warn', summary: 'Atenção', detail: 'Escolhe 100, 200, 300, 400 ou 500 bilhetes.', life: 3000 });
+    const qty = Number(form.value.qty);
+    if (!Number.isInteger(qty) || qty < 1) {
+        toast.add({ severity: 'warn', summary: 'Atenção', detail: 'Indica a quantidade de bilhetes (mínimo 1).', life: 3000 });
         return;
     }
     if (Number(form.value.qty) > available.value) {
@@ -230,6 +224,101 @@ const qrValue = (detail) =>
         ie: detail.event_id
     });
 
+const ticketPayload = (data, batch, detail) => ({
+    event: data.event,
+    ticketName: data.ticket?.name,
+    buyerName: data.buyer_name,
+    price: data.price,
+    batchNumber: data.batch_id ?? batch.id,
+    detail
+});
+
+const loadBatchTickets = async (batch) => {
+    const { data } = await axios.get(`${baseURL}/promotor-tickets/${props.ticket.id}/batches/${batch.id}/tickets`);
+    const units = data.tickets || [];
+    if (!units.length) {
+        throw new Error('Este lote não tem bilhetes válidos para imprimir.');
+    }
+    return { data, units };
+};
+
+const readyThermalFonts = async () => {
+    if (!document.fonts?.load) return;
+    await Promise.all([
+        document.fonts.load('700 12px Montserrat'),
+        document.fonts.load('800 12px Montserrat'),
+        document.fonts.load('900 12px Montserrat')
+    ]);
+};
+
+const renderThermalTicket = async (payload) => {
+    thermalItem.value = payload;
+    await nextTick();
+    await wait(60);
+    const ticketEl = thermalStage.value?.querySelector('.thermal-ticket');
+    if (!ticketEl) {
+        throw new Error('Não foi possível desenhar o bilhete.');
+    }
+    return ticketEl;
+};
+
+const PRINT_PAGE_CSS = `
+@page { size: 152.4mm 82.6mm; margin: 0; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #fff;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sheet {
+  width: 152.4mm;
+  height: 82.6mm;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+}
+.sheet:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+`;
+
+const openThermalPrintFrame = () => {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.style.cssText = 'position:fixed;left:0;top:0;width:152.4mm;height:82.6mm;opacity:0;pointer-events:none;border:0;';
+    document.body.appendChild(iframe);
+    const doc = iframe.contentDocument;
+    doc.open();
+    doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>BOCA thermal</title></head><body></body></html>');
+    doc.close();
+    document.querySelectorAll('link[rel="stylesheet"], style').forEach((node) => {
+        doc.head.appendChild(node.cloneNode(true));
+    });
+    const page = doc.createElement('style');
+    page.textContent = PRINT_PAGE_CSS;
+    doc.head.appendChild(page);
+    return { iframe, doc };
+};
+
+const waitForPrintReady = async (doc) => {
+    await Promise.all(
+        [...doc.images].map((img) =>
+            img.complete && img.naturalWidth
+                ? Promise.resolve()
+                : new Promise((resolve) => {
+                      img.onload = resolve;
+                      img.onerror = resolve;
+                  })
+        )
+    );
+    if (doc.fonts?.ready) {
+        await doc.fonts.ready;
+    }
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+};
+
 const downloadPdf = async (batch, layout) => {
     if (!batch.unused) {
         toast.add({
@@ -244,52 +333,35 @@ const downloadPdf = async (batch, layout) => {
     loadingPdfKey.value = `${batch.id}-${layout}`;
     pdfProgress.value = 'A carregar bilhetes…';
     try {
-        const { data } = await axios.get(
-            `${baseURL}/promotor-tickets/${props.ticket.id}/batches/${batch.id}/tickets`
-        );
-        const units = data.tickets || [];
-        if (!units.length) {
-            throw new Error('Este lote não tem bilhetes válidos para imprimir.');
-        }
-
+        const { data, units } = await loadBatchTickets(batch);
         const canvases = [];
         const isThermal = layout === 'boca-thermal';
         const scale = isThermal ? 3 : 2;
-        if (isThermal && document.fonts?.load) {
-            await document.fonts.load('500 12px Montserrat');
-            await document.fonts.load('900 12px Montserrat');
+        if (isThermal) {
+            await readyThermalFonts();
         }
 
         for (let i = 0; i < units.length; i++) {
             pdfProgress.value = `A gerar ${i + 1} / ${units.length}`;
-            const payload = {
-                event: data.event,
-                ticketName: data.ticket?.name,
-                buyerName: data.buyer_name,
-                price: data.price,
-                batchNumber: data.batch_id ?? batch.id,
-                detail: units[i]
-            };
+            const payload = ticketPayload(data, batch, units[i]);
             if (isThermal) {
-                thermalItem.value = payload;
+                const ticketEl = await renderThermalTicket(payload);
+                canvases.push(await captureThermalTicketEl(ticketEl));
             } else {
                 printItem.value = payload;
+                await nextTick();
+                await wait(60);
+                const ticketEl = printStage.value?.querySelector('.ticket');
+                if (!ticketEl) {
+                    throw new Error('Não foi possível desenhar o bilhete.');
+                }
+                const canvas = await captureTicketEl(ticketEl, scale);
+                canvases.push({
+                    data: canvas.toDataURL('image/jpeg', 0.92),
+                    width: canvas.width,
+                    height: canvas.height
+                });
             }
-            await nextTick();
-            await wait(60);
-
-            const ticketEl = isThermal
-                ? thermalStage.value?.querySelector('.thermal-ticket')
-                : printStage.value?.querySelector('.ticket');
-            if (!ticketEl) {
-                throw new Error('Não foi possível desenhar o bilhete.');
-            }
-            const canvas = await captureTicketEl(ticketEl, scale);
-            canvases.push({
-                data: canvas.toDataURL('image/jpeg', 0.92),
-                width: canvas.width,
-                height: canvas.height
-            });
         }
 
         const pdf = isThermal ? buildThermalPdf(canvases) : buildLayoutPdf(canvases, layout, scale);
@@ -322,6 +394,79 @@ const downloadPdf = async (batch, layout) => {
     }
 };
 
+const printThermalHtml = async (batch) => {
+    if (!batch.unused) {
+        toast.add({
+            severity: 'warn',
+            summary: 'Atenção',
+            detail: 'Este lote não tem bilhetes válidos para imprimir.',
+            life: 3000
+        });
+        return;
+    }
+
+    loadingPdfKey.value = `${batch.id}-boca-thermal-html`;
+    pdfProgress.value = 'A preparar impressão HTML…';
+    let iframe = null;
+    try {
+        const { data, units } = await loadBatchTickets(batch);
+        await readyThermalFonts();
+        const frame = openThermalPrintFrame();
+        iframe = frame.iframe;
+
+        for (let i = 0; i < units.length; i++) {
+            pdfProgress.value = `A preparar ${i + 1} / ${units.length}`;
+            const ticketEl = await renderThermalTicket(ticketPayload(data, batch, units[i]));
+            await inlineTicketImages(ticketEl);
+            const sheet = frame.doc.createElement('div');
+            sheet.className = 'sheet';
+            sheet.appendChild(ticketEl.cloneNode(true));
+            frame.doc.body.appendChild(sheet);
+        }
+
+        await waitForPrintReady(frame.doc);
+        pdfProgress.value = 'A abrir impressão…';
+
+        await new Promise((resolve, reject) => {
+            const win = iframe.contentWindow;
+            if (!win) {
+                reject(new Error('Não foi possível abrir a janela de impressão.'));
+                return;
+            }
+            let settled = false;
+            const done = () => {
+                if (settled) return;
+                settled = true;
+                win.removeEventListener('afterprint', done);
+                resolve();
+            };
+            win.addEventListener('afterprint', done);
+            win.focus();
+            win.print();
+            setTimeout(done, 120000);
+        });
+
+        toast.add({
+            severity: 'success',
+            summary: 'Impressão HTML enviada',
+            detail: 'bilhete gerado com sucesso.',
+            life: 4000
+        });
+    } catch (error) {
+        toast.add({
+            severity: 'error',
+            summary: 'Erro',
+            detail: error?.message || error?.response?.data?.message || 'Não foi possível imprimir o HTML.',
+            life: 4000
+        });
+    } finally {
+        iframe?.remove();
+        thermalItem.value = null;
+        pdfProgress.value = '';
+        loadingPdfKey.value = null;
+    }
+};
+
 watch(
     () => props.ticket?.id,
     () => {
@@ -346,7 +491,7 @@ onMounted(loadBatches);
                 label="Gerar lote"
                 icon="pi pi-ticket"
                 :disabled="!canGenerate"
-                :title="isLive ? 'Bilhetes live não têm QR de entrada' : available < 100 ? 'Stock abaixo de 100' : ''"
+                :title="isLive ? 'Bilhetes live não têm QR de entrada' : available < 1 ? 'Sem stock disponível' : ''"
                 @click="openCreate"
             />
         </div>
@@ -408,8 +553,18 @@ onMounted(loadBatches);
                         size="small"
                         :loading="loadingPdfKey === `${batch.id}-boca-thermal`"
                         :disabled="!batch.unused || !!loadingPdfKey"
-                        title="Térmico 15,24 × 8,26 cm, um bilhete por página"
+                        title="PDF térmico 15,24 × 8,26 cm, um bilhete por página"
                         @click="downloadPdf(batch, 'boca-thermal')"
+                    />
+                    <Button
+                        label="BOCA thermal HTML"
+                        icon="pi pi-print"
+                        outlined
+                        size="small"
+                        :loading="loadingPdfKey === `${batch.id}-boca-thermal-html`"
+                        :disabled="!batch.unused || !!loadingPdfKey"
+                        title="Teste: imprime o HTML na BOCA, como o ficheiro de referência"
+                        @click="printThermalHtml(batch)"
                     />
                     <Button
                         label="Devolver"
@@ -473,16 +628,33 @@ onMounted(loadBatches);
 
         <div class="field">
             <label for="batch_qty">Quantidade <span class="required">*</span></label>
-            <Dropdown
-                id="batch_qty"
+            <InputNumber
+                inputId="batch_qty"
                 v-model="form.qty"
-                :options="qtyOptions"
-                optionLabel="label"
-                optionValue="value"
-                optionDisabled="disabled"
+                :min="1"
+                :max="available"
+                :useGrouping="false"
+                showButtons
                 class="w-full"
-                placeholder="Escolhe 100 a 500"
+                inputClass="w-full"
+                :placeholder="`1 a ${available}`"
             />
+            <div class="flex flex-wrap gap-2 mt-2">
+                <Button
+                    v-for="size in quickOptions"
+                    :key="size"
+                    :label="String(size)"
+                    size="small"
+                    :outlined="form.qty !== size"
+                    @click="form.qty = size"
+                />
+                <Button
+                    :label="`Tudo (${available})`"
+                    size="small"
+                    :outlined="form.qty !== available"
+                    @click="form.qty = available"
+                />
+            </div>
         </div>
 
         <div class="field">

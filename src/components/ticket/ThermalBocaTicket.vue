@@ -211,8 +211,10 @@ const priceLabel = computed(() => {
     display: flex;
     overflow: hidden;
     font-family: 'Montserrat', Arial, 'Helvetica Neue', Helvetica, sans-serif;
-    font-weight: 500;
+    font-weight: 700;
     box-sizing: border-box;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
 }
 
 .lbl {
@@ -220,7 +222,7 @@ const priceLabel = computed(() => {
     align-items: center;
     gap: 1mm;
     font-size: 5.8pt;
-    font-weight: 500;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.2pt;
     line-height: 1.2;
@@ -246,7 +248,7 @@ const priceLabel = computed(() => {
 .sub {
     display: block;
     font-size: 6pt;
-    font-weight: 500;
+    font-weight: 700;
     line-height: 1.2;
     white-space: nowrap;
     overflow: hidden;
@@ -326,6 +328,7 @@ const priceLabel = computed(() => {
 .side-meta {
     font-size: 5.5pt;
     line-height: 1.35;
+    font-weight: 700;
 }
 
 .side-meta.strong {
@@ -349,6 +352,7 @@ const priceLabel = computed(() => {
 
 .slogan {
     font-size: 5.5pt;
+    font-weight: 700;
 }
 
 .m-title {
@@ -358,7 +362,7 @@ const priceLabel = computed(() => {
 .kicker {
     display: block;
     font-size: 6pt;
-    font-weight: 600;
+    font-weight: 700;
     letter-spacing: 0.5mm;
     text-transform: uppercase;
 }
@@ -410,6 +414,7 @@ const priceLabel = computed(() => {
     font-size: 5.5pt;
     letter-spacing: 0.4mm;
     text-transform: uppercase;
+    font-weight: 700;
 }
 
 .stub-code {
@@ -443,6 +448,7 @@ const priceLabel = computed(() => {
 
 .stub-sub {
     font-size: 5.5pt;
+    font-weight: 700;
     line-height: 1.3;
     margin-top: 0.4mm;
 }

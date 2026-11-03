@@ -5,6 +5,9 @@ import { jsPDF } from 'jspdf';
 import { baseURL } from '@/service/ApiConstant';
 
 const PX_TO_MM = 25.4 / 96;
+const THERMAL_DPI = 300;
+const THERMAL_SCALE = THERMAL_DPI / 96;
+const THERMAL_THRESHOLD = 180;
 const imageDataUrlCache = new Map();
 
 const waitForImage = (img) =>
@@ -141,6 +144,29 @@ const captureTicketEl = async (ticketEl, scale = 3) => {
     }
 };
 
+const toThermalMonoCanvas = (canvas) => {
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = img.data;
+    for (let i = 0; i < pixels.length; i += 4) {
+        const lum = 0.299 * pixels[i] + 0.587 * pixels[i + 1] + 0.114 * pixels[i + 2];
+        const value = lum < THERMAL_THRESHOLD ? 0 : 255;
+        pixels[i] = pixels[i + 1] = pixels[i + 2] = value;
+        pixels[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    return canvas;
+};
+
+const captureThermalTicketEl = async (ticketEl) => {
+    const canvas = toThermalMonoCanvas(await captureTicketEl(ticketEl, THERMAL_SCALE));
+    return {
+        data: canvas.toDataURL('image/png'),
+        width: canvas.width,
+        height: canvas.height
+    };
+};
+
 const safeFileName = (name) => (name || 'bilhete').replace(/[\\/:*?"<>|]+/g, '').trim() || 'bilhete';
 
 const addTicketPage = (pdf, canvas, scale = 3) => {
@@ -179,7 +205,7 @@ const asImageShot = (item) => {
 const A4_W = 210;
 const A4_H = 297;
 
-const buildA4Pdf = (canvases, scale = 2) => {
+const buildA4Pdf = (canvases) => {
     const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
     const margin = 8;
     const gap = 3;
@@ -224,11 +250,18 @@ const buildThermalPdf = (canvases) => {
     });
 
     canvases.forEach((canvas, index) => {
-        const shot = asImageShot(canvas);
+        const shot =
+            canvas?.data && canvas.width
+                ? canvas
+                : {
+                      data: toThermalMonoCanvas(canvas).toDataURL('image/png'),
+                      width: canvas.width,
+                      height: canvas.height
+                  };
         if (index > 0) {
             pdf.addPage([THERMAL_W, THERMAL_H], 'l');
         }
-        pdf.addImage(shot.data, 'JPEG', 0, 0, THERMAL_W, THERMAL_H, undefined, 'FAST');
+        pdf.addImage(shot.data, 'PNG', 0, 0, THERMAL_W, THERMAL_H);
     });
 
     return pdf;
@@ -291,6 +324,8 @@ export function useTicketPdf() {
         downloadTicketsBySelector,
         buildPdfBlobFromElements,
         captureTicketEl,
+        captureThermalTicketEl,
+        inlineTicketImages,
         buildLayoutPdf,
         buildThermalPdf
     };
